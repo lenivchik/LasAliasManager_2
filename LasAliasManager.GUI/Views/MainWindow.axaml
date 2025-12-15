@@ -1,0 +1,188 @@
+﻿<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:LasAliasManager.GUI.ViewModels"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d" d:DesignWidth="1200" d:DesignHeight="700"
+        x:Class="LasAliasManager.GUI.Views.MainWindow"
+        x:DataType="vm:MainWindowViewModel"
+        Title="LAS Curve Alias Manager"
+        Width="1400" Height="800"
+        MinWidth="900" MinHeight="500"
+        WindowStartupLocation="CenterScreen">
+    
+    <Grid RowDefinitions="Auto,Auto,Auto,*,Auto">
+        <!-- Row 0: Menu Bar -->
+        <Menu Grid.Row="0">
+            <MenuItem Header="Файл">
+                <MenuItem Header="Загрузить базу данных..." Click="LoadDatabase_Click"/>
+                <MenuItem Header="Загрузить директорию..." Click="LoadFolder_Click"/>
+                <Separator/>
+                <MenuItem Header="Сохранить изменения" Command="{Binding SaveChangesCommand}" 
+                          IsEnabled="{Binding HasUnsavedChanges}"/>
+                <Separator/>
+                <MenuItem Header="Выход" Click="Exit_Click"/>
+            </MenuItem>
+            <MenuItem Header="Изменить">
+                <MenuItem Header="Обновить страницу" Command="{Binding RefreshViewCommand}"/>
+                <MenuItem Header="Очистить все изменения" Command="{Binding ClearAllChangesCommand}"/>
+            </MenuItem>
+            <MenuItem Header="Помощь">
+                <MenuItem Header="О программе" Click="About_Click"/>
+            </MenuItem>
+        </Menu>
+
+        <!-- Row 1: Toolbar -->
+        <Border Grid.Row="1" Background="#F0F0F0" Padding="8">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <Button Content="Загрузить базу данных" Click="LoadDatabase_Click" 
+                        ToolTip.Tip="Загрузить данные c БД (CSV файл)"/>
+                <Button Content="Выбрать директорию" Click="LoadFolder_Click"
+                        ToolTip.Tip="Выбрать папку с Las файлами"/>
+                <Rectangle Width="1" Fill="Gray" Margin="4,0"/>
+                <Button Content="Сохранить" Command="{Binding SaveChangesCommand}"
+                        IsEnabled="{Binding HasUnsavedChanges}"
+                        ToolTip.Tip="Сохранить изменения в БД"/>
+                <Rectangle Width="1" Fill="Gray" Margin="4,0"/>
+                <CheckBox Content="Включить вложенные файлы" IsChecked="{Binding IncludeSubfolders}"
+                          VerticalAlignment="Center"/>
+                <CheckBox Content="Показывать только неопределенные" IsChecked="{Binding ShowOnlyUnknown}"
+                          VerticalAlignment="Center" Margin="16,0,0,0"/>
+            </StackPanel>
+        </Border>
+
+        <!-- Row 2: Info Panel (unsaved changes warning) -->
+        <Border Grid.Row="2" Background="#E8F4FD" Padding="8" 
+                IsVisible="{Binding HasUnsavedChanges}">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <TextBlock Text="!" FontSize="16" VerticalAlignment="Center" FontWeight="Bold" Foreground="Orange"/>
+                <TextBlock Text="You have unsaved changes. Click Save to update the database." 
+                           VerticalAlignment="Center" FontWeight="SemiBold"/>
+            </StackPanel>
+        </Border>
+
+        <!-- Row 3: Main Content - Split View -->
+        <Grid Grid.Row="3" ColumnDefinitions="300,Auto,*" Margin="8">
+            
+            <!-- Left Panel: File List -->
+            <Border Grid.Column="0" BorderBrush="Gray" BorderThickness="1" CornerRadius="4">
+                <Grid RowDefinitions="Auto,*">
+                    <!-- File List Header -->
+                    <Border Grid.Row="0" Background="#E0E0E0" Padding="8">
+                        <TextBlock Text="LAS Файлы" FontWeight="Bold"/>
+                    </Border>
+                    
+                    <!-- File ListBox -->
+                    <ListBox Grid.Row="1" 
+                             x:Name="FileListBox"
+                             ItemsSource="{Binding LasFiles}"
+                             SelectedItem="{Binding SelectedFile}"
+                             Background="White">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate x:DataType="vm:LasFileViewModel">
+                                <Border Padding="4" Background="{Binding BackgroundColor}">
+                                    <StackPanel>
+                                        <TextBlock Text="{Binding FileName}" FontWeight="SemiBold"/>
+                                        <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
+                                            <TextBlock Text="{Binding CurveCount, StringFormat='Кривые: {0}'}" 
+                                                       FontSize="11" Foreground="Gray"/>
+                                            <TextBlock Text="{Binding UnknownCount, StringFormat=' | Неизвестные: {0}'}" 
+                                                       FontSize="11" Foreground="Orange"
+                                                       IsVisible="{Binding HasUnknown}"/>
+                                        </StackPanel>
+                                        <TextBlock Text="{Binding FileSizeFormatted}" 
+                                                   FontSize="10" Foreground="Gray"/>
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </Grid>
+            </Border>
+
+            <!-- Splitter -->
+            <GridSplitter Grid.Column="1" Width="5" Background="Transparent" 
+                          ResizeDirection="Columns" ResizeBehavior="PreviousAndNext"/>
+
+            <!-- Right Panel: Curves for Selected File -->
+            <Border Grid.Column="2" BorderBrush="Gray" BorderThickness="1" CornerRadius="4">
+                <Grid RowDefinitions="Auto,Auto,*">
+                    <!-- Curve Panel Header -->
+                    <Border Grid.Row="0" Background="#E0E0E0" Padding="8">
+                        <StackPanel>
+                            <TextBlock Text="{Binding SelectedFile.FileName, FallbackValue='Выберите файл'}" 
+                                       FontWeight="Bold"/>
+                            <StackPanel Orientation="Horizontal" Margin="0,4,0,0"
+                                        IsVisible="{Binding SelectedFile, Converter={x:Static ObjectConverters.IsNotNull}}">
+                                <TextBlock Text="{Binding SelectedFile.TopFormatted, StringFormat='Кровля: {0}'}" 
+                                           FontSize="11" Margin="0,0,16,0"/>
+                                <TextBlock Text="{Binding SelectedFile.BottomFormatted, StringFormat='Подошва: {0}'}" 
+                                           FontSize="11" Margin="0,0,16,0"/>
+                                <TextBlock Text="{Binding SelectedFile.StepFormatted, StringFormat='Шаг: {0}'}" 
+                                           FontSize="11" Margin="0,0,16,0"/>
+
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+                    
+                    <!-- Filter -->
+                    <Border Grid.Row="1" Padding="8" Background="#F8F8F8">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <TextBlock Text="Фильтр:" VerticalAlignment="Center"/>
+                            <TextBox Text="{Binding FilterText}" Width="200" Watermark="Поиск кривых..."/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Curves DataGrid -->
+                    <DataGrid Grid.Row="2"
+                              x:Name="CurvesGrid"
+                              ItemsSource="{Binding FilteredCurves}"
+                              AutoGenerateColumns="False"
+                              CanUserResizeColumns="True"
+                              CanUserReorderColumns="True"
+                              CanUserSortColumns="True"
+                              GridLinesVisibility="All"
+                              IsReadOnly="False"
+                              SelectionMode="Extended"
+                              Background="White">
+                        
+                        <DataGrid.Columns>
+                            <!-- Curve Field Name -->
+                            <DataGridTextColumn Header="Полевое имя" 
+                                                Binding="{Binding CurveFieldName}"
+                                                Width="150"
+                                                IsReadOnly="True"/>
+                            
+                            <!-- Primary Name (ComboBox) -->
+                            <DataGridTemplateColumn Header="Основное имя" Width="180">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate x:DataType="vm:CurveRowViewModel">
+                                        <ComboBox ItemsSource="{Binding AvailablePrimaryNames}"
+                                                  SelectedItem="{Binding PrimaryName}"
+                                                  HorizontalAlignment="Stretch"/>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </Grid>
+            </Border>
+        </Grid>
+
+        <!-- Row 4: Status Bar -->
+        <Border Grid.Row="4" Background="#E0E0E0" Padding="8,4">
+            <StackPanel Orientation="Horizontal">
+                <TextBlock Text="{Binding StatusMessage}" VerticalAlignment="Center" TextWrapping="Wrap" Width="500"/>
+                <TextBlock Text="{Binding TotalFiles, StringFormat='Файлов: {0}'}" 
+                           Margin="16,0" VerticalAlignment="Center"/>
+                <TextBlock Text="{Binding TotalCurves, StringFormat='Всего кривых: {0}'}" 
+                           Margin="16,0" VerticalAlignment="Center"/>
+                <TextBlock Text="{Binding UnknownCurves, StringFormat='Неизвестных: {0}'}" 
+                           Margin="16,0" VerticalAlignment="Center" Foreground="Orange"/>
+                <ProgressBar IsIndeterminate="True" Width="100" 
+                             IsVisible="{Binding IsLoading}" Margin="16,0,0,0"/>
+            </StackPanel>
+        </Border>
+    </Grid>
+</Window>
