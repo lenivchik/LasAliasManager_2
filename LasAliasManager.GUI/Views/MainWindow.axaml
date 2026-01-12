@@ -56,7 +56,7 @@
                 IsVisible="{Binding HasUnsavedChanges}">
             <StackPanel Orientation="Horizontal" Spacing="8">
                 <TextBlock Text="!" FontSize="16" VerticalAlignment="Center" FontWeight="Bold" Foreground="Orange"/>
-                <TextBlock Text="You have unsaved changes. Click Save to update the database." 
+                <TextBlock Text="Найдены несохраненные изменения!!!" 
                            VerticalAlignment="Center" FontWeight="SemiBold"/>
             </StackPanel>
         </Border>
@@ -158,7 +158,7 @@
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate x:DataType="vm:CurveRowViewModel">
                                         <ComboBox ItemsSource="{Binding AvailablePrimaryNames}"
-                                                  SelectedItem="{Binding PrimaryName}"
+                                                  SelectedItem="{Binding PrimaryName,  Mode=TwoWay}"
                                                   HorizontalAlignment="Stretch"/>
                                     </DataTemplate>
                                 </DataGridTemplateColumn.CellTemplate>

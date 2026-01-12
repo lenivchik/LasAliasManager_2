@@ -1,4 +1,5 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
+using System;
 using System.Collections.ObjectModel;
 
 namespace LasAliasManager.GUI.ViewModels;
@@ -70,17 +71,17 @@ public partial class CurveRowViewModel : ObservableObject
     /// <summary>
     /// Formatted Top value
     /// </summary>
-    public string TopFormatted => Top.HasValue ? Top.Value.ToString() : "-";
+    public string TopFormatted => Top.HasValue ? Top.Value.ToString("F2") : "-";
 
     /// <summary>
     /// Formatted Bottom value
     /// </summary>
-    public string BottomFormatted => Bottom.HasValue ? Bottom.Value.ToString() : "-";
+    public string BottomFormatted => Bottom.HasValue ? Bottom.Value.ToString("F2") : "-";
 
     /// <summary>
     /// Formatted Step value
     /// </summary>
-    public string StepFormatted => Step.HasValue ? Step.Value.ToString() : "-";
+    public string StepFormatted => Step.HasValue ? Step.Value.ToString("F4") : "-";
 
     /// <summary>
     /// Unit for depth values
@@ -125,10 +126,16 @@ public partial class CurveRowViewModel : ObservableObject
     /// </summary>
     public string? OriginalPrimaryName { get; set; }
 
+    /// <summary>
+    /// Callback when modification status changes
+    /// </summary>
+    public Action? OnModificationChanged { get; set; }
+
     partial void OnPrimaryNameChanged(string? value)
     {
         IsModified = value != OriginalPrimaryName;
         OnPropertyChanged(nameof(StatusText));
+        OnModificationChanged?.Invoke();
     }
 
     partial void OnIsModifiedChanged(bool value)
@@ -156,6 +163,10 @@ public partial class CurveRowViewModel : ObservableObject
         OnPropertyChanged(nameof(BottomFormatted));
     }
 
+    partial void OnStepChanged(double? value)
+    {
+        OnPropertyChanged(nameof(StepFormatted));
+    }
 
     partial void OnFileSizeChanged(long value)
     {

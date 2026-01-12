@@ -1,4 +1,4 @@
-namespace LasAliasManager.Core.Models;
+﻿namespace LasAliasManager.Core.Models;
 
 /// <summary>
 /// Database containing all curve aliases and ignored names
@@ -23,11 +23,11 @@ public class AliasDatabase
     public string? FindBaseName(string fieldName)
     {
         var trimmed = fieldName.Trim();
-        
-        // Check if it's a base name itself
-        if (Aliases.ContainsKey(trimmed))
-            return trimmed;
 
+        // Check if it's a base name itself
+
+        if (Aliases.TryGetValue(trimmed, out var alias))
+            return alias.BaseName;  // Returns "DTp" (the actual base name)
         // Search through all aliases
         foreach (var kvp in Aliases)
         {

@@ -88,7 +88,7 @@ public partial class MainWindowViewModel : ObservableObject
         try
         {
             IsLoading = true;
-            StatusMessage = "Loading CSV database...";
+            StatusMessage = "Загрузка БД...";
 
             await Task.Run(() =>
             {
@@ -100,6 +100,10 @@ public partial class MainWindowViewModel : ObservableObject
 
             var stats = _aliasManager.Database.GetStatistics();
             StatusMessage = $"База данных загружена: {stats.BaseCount} Основных имен, {stats.TotalAliases} Полевых имен, {stats.IgnoredCount} Игнорируются";
+            if (!string.IsNullOrEmpty(CurrentFolderPath))
+            {
+                await ReanalyzeLoadedFilesAsync();
+            }
         }
         catch (Exception ex)
         {
@@ -110,6 +114,68 @@ public partial class MainWindowViewModel : ObservableObject
             IsLoading = false;
         }
     }
+
+    private async Task ReanalyzeLoadedFilesAsync()
+    {
+        StatusMessage = "Анализ файлов...";
+
+        await Task.Run(() =>
+        {
+            foreach (var fileVm in LasFiles)
+            {
+                var result = _aliasManager.AnalyzeLasFile(fileVm.FilePath);
+                if (result.HasError)
+                    continue;
+
+                // Update each curve's status
+                foreach (var curve in fileVm.Curves)
+                {
+                    var fieldName = curve.CurveFieldName;
+
+                    if (_aliasManager.Database.IsIgnored(fieldName))
+                    {
+                        curve.OriginalPrimaryName = "[ИГНОРИРОВАТЬ]";
+                        curve.PrimaryName = "[ИГНОРИРОВАТЬ]";
+                        curve.IsUnknown = false;
+                        curve.IsIgnored = true;
+                    }
+                    else
+                    {
+                        var baseName = _aliasManager.Database.FindBaseName(fieldName);
+                        if (baseName != null)
+                        {
+                            curve.OriginalPrimaryName = baseName;
+                            curve.PrimaryName = baseName;
+                            curve.IsUnknown = false;
+                            curve.IsIgnored = false;
+                        }
+                        else
+                        {
+                            curve.OriginalPrimaryName = "";
+                            curve.PrimaryName = "";
+                            curve.IsUnknown = true;
+                            curve.IsIgnored = false;
+                        }
+                    }
+                    curve.IsModified = false;
+                }
+
+                fileVm.RefreshStatus();
+            }
+        });
+
+        // Update totals
+        TotalCurves = LasFiles.Sum(f => f.CurveCount);
+        UnknownCurves = LasFiles.Sum(f => f.UnknownCount);
+
+        // Refresh current view
+        ApplyFilter();
+        UpdateHasUnsavedChanges();
+
+        StatusMessage = $"Re-analyzed {LasFiles.Count} files, {TotalCurves} curves ({UnknownCurves} unknown)";
+    }
+
+
 
     [RelayCommand]
     private async Task LoadTxtDatabaseAsync(string[]? paths)
@@ -196,7 +262,7 @@ public partial class MainWindowViewModel : ObservableObject
                 {
                     foreach (var fieldName in mapped.Value)
                     {
-                        var row = CreateCurveRow(fieldName);
+                        var row = CreateCurveRow(fieldName, fileVm);
                         row.OriginalPrimaryName = mapped.Key;
                         row.PrimaryName = mapped.Key;
                         row.IsUnknown = false;
@@ -208,7 +274,7 @@ public partial class MainWindowViewModel : ObservableObject
                 // Add ignored curves
                 foreach (var ignored in result.IgnoredCurves)
                 {
-                    var row = CreateCurveRow(ignored);
+                    var row = CreateCurveRow(ignored, fileVm);
                     row.OriginalPrimaryName = "[ИГНОРИРОВАТЬ]";
                     row.PrimaryName = "[ИГНОРИРОВАТЬ]";
                     row.IsUnknown = false;
@@ -219,9 +285,9 @@ public partial class MainWindowViewModel : ObservableObject
                 // Add unknown curves
                 foreach (var unknown in result.UnknownCurves)
                 {
-                    var row = CreateCurveRow(unknown);
+                    var row = CreateCurveRow(unknown, fileVm);
+                    row.OriginalPrimaryName = "";
                     row.PrimaryName = "";
-                    row.OriginalPrimaryName = null;
                     row.IsUnknown = true;
                     row.IsIgnored = false;
                     fileVm.Curves.Add(row);
@@ -256,13 +322,25 @@ public partial class MainWindowViewModel : ObservableObject
         }
     }
 
-    private CurveRowViewModel CreateCurveRow(string curveName)
+    private CurveRowViewModel CreateCurveRow(string curveName, LasFileViewModel parentFile)
     {
-        return new CurveRowViewModel
+
+        var row = new CurveRowViewModel
         {
             AvailablePrimaryNames = AvailablePrimaryNames,
             CurveFieldName = curveName
         };
+
+        // Wire up modification callback
+        row.OnModificationChanged = () =>
+        {
+            parentFile.RefreshStatus();
+            UpdateHasUnsavedChanges();
+
+            // Update total unknown count
+            UnknownCurves = LasFiles.Sum(f => f.UnknownCount);
+        };
+        return row;
     }
 
     private void ApplyFilter()

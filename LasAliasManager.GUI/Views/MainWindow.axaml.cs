@@ -94,7 +94,7 @@ public partial class MainWindow : Window
     {
         var box = MessageBoxManager.GetMessageBoxStandard(
             "About LAS Curve Alias Manager",
-            "LAS Curve Alias Manager v1.0\n\n" +
+            "LAS Curve Alias Manager v1.0\n\n" + 
             "A tool for managing curve name aliases in LAS files.\n\n" +
             "Supported database formats:\n" +
             "• CSV (recommended) - single file\n" +
@@ -129,8 +129,8 @@ public partial class MainWindow : Window
         e.Cancel = true;
 
         var box = MessageBoxManager.GetMessageBoxStandard(
-            "Unsaved Changes",
-            "You have unsaved changes. Do you want to save before closing?",
+            "Несохраненные изменения",
+            "Найдены несохраненные иземения. Сохранить их перед выходом?",
             ButtonEnum.YesNoCancel,
             MsBox.Avalonia.Enums.Icon.Warning);
 
