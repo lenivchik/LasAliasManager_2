@@ -31,41 +31,14 @@ public partial class MainWindow : Window
             AllowMultiple = false,
             FileTypeFilter = new[]
             {
-                new FilePickerFileType("CSV Files") { Patterns = new[] { "*.csv" } },
-                //new FilePickerFileType("Text Files") { Patterns = new[] { "*.txt" } },
-                //new FilePickerFileType("All Files") { Patterns = new[] { "*.*" } }
+                new FilePickerFileType("CSV Files") { Patterns = new[] { "*.csv" } }
             }
         });
 
         if (files.Count == 0) return;
 
         var selectedFile = files[0].Path.LocalPath;
-
-        // Check if CSV or TXT
-        if (selectedFile.EndsWith(".csv", StringComparison.OrdinalIgnoreCase))
-        {
-            // CSV - single file
-            await ViewModel.LoadCsvDatabaseCommand.ExecuteAsync(selectedFile);
-        }
-        else
-        {
-            // TXT - need second file (ignored names)
-            var ignoredFiles = await topLevel.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
-            {
-                Title = "Select Ignored Names File (ListNameAlias_NO.txt)",
-                AllowMultiple = false,
-                FileTypeFilter = new[]
-                {
-                    new FilePickerFileType("Text Files") { Patterns = new[] { "*.txt" } },
-                    new FilePickerFileType("All Files") { Patterns = new[] { "*.*" } }
-                }
-            });
-
-            if (ignoredFiles.Count == 0) return;
-
-            var ignoredFile = ignoredFiles[0].Path.LocalPath;
-            await ViewModel.LoadTxtDatabaseCommand.ExecuteAsync(new[] { selectedFile, ignoredFile });
-        }
+        await ViewModel.LoadCsvDatabaseCommand.ExecuteAsync(selectedFile);
     }
 
     private async void LoadFolder_Click(object? sender, RoutedEventArgs e)

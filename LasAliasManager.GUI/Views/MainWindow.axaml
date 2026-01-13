@@ -75,7 +75,7 @@
                     <!-- File ListBox -->
                     <ListBox Grid.Row="1" 
                              x:Name="FileListBox"
-                             ItemsSource="{Binding LasFiles}"
+                             ItemsSource="{Binding FilteredFiles}"
                              SelectedItem="{Binding SelectedFile}"
                              Background="White">
                         <ListBox.ItemTemplate>

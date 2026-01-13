@@ -17,6 +17,9 @@ public partial class MainWindowViewModel : ObservableObject
     private ObservableCollection<LasFileViewModel> _lasFiles = new();
 
     [ObservableProperty]
+    private ObservableCollection<LasFileViewModel> _filteredFiles = new();
+
+    [ObservableProperty]
     private LasFileViewModel? _selectedFile;
 
     [ObservableProperty]
@@ -73,11 +76,20 @@ public partial class MainWindowViewModel : ObservableObject
 
     partial void OnSelectedFileChanged(LasFileViewModel? value)
     {
-        ApplyFilter();
+        ApplyCurveFilter();
     }
 
-    partial void OnShowOnlyUnknownChanged(bool value) => ApplyFilter();
-    partial void OnFilterTextChanged(string value) => ApplyFilter();
+    partial void OnShowOnlyUnknownChanged(bool value)
+    {
+        ApplyFileFilter();
+        ApplyCurveFilter();
+    }
+
+    partial void OnFilterTextChanged(string value)
+    {
+        ApplyFileFilter();
+        ApplyCurveFilter();
+    }
 
     [RelayCommand]
     private async Task LoadCsvDatabaseAsync(string? csvPath)
@@ -169,7 +181,8 @@ public partial class MainWindowViewModel : ObservableObject
         UnknownCurves = LasFiles.Sum(f => f.UnknownCount);
 
         // Refresh current view
-        ApplyFilter();
+        ApplyFileFilter();
+        ApplyCurveFilter();
         UpdateHasUnsavedChanges();
 
         StatusMessage = $"Re-analyzed {LasFiles.Count} files, {TotalCurves} curves ({UnknownCurves} unknown)";
@@ -305,10 +318,12 @@ public partial class MainWindowViewModel : ObservableObject
             UnknownCurves = totalUnknown;
 
             // Select first file if available
-            if (LasFiles.Count > 0)
+            ApplyFileFilter();
+            if (FilteredFiles.Count > 0)
             {
-                SelectedFile = LasFiles[0];
+                SelectedFile = FilteredFiles[0];
             }
+            ApplyCurveFilter();
 
             StatusMessage = $"Загружено: {TotalFiles} файлов, {TotalCurves} кривых ({UnknownCurves} неизвестных)";
         }
@@ -322,9 +337,9 @@ public partial class MainWindowViewModel : ObservableObject
         }
     }
 
+
     private CurveRowViewModel CreateCurveRow(string curveName, LasFileViewModel parentFile)
     {
-
         var row = new CurveRowViewModel
         {
             AvailablePrimaryNames = AvailablePrimaryNames,
@@ -339,11 +354,46 @@ public partial class MainWindowViewModel : ObservableObject
 
             // Update total unknown count
             UnknownCurves = LasFiles.Sum(f => f.UnknownCount);
+
+            // Update file filter if "Show Only Unknown" is active
+            if (ShowOnlyUnknown)
+            {
+                ApplyFileFilter();
+            }
         };
+
         return row;
     }
 
-    private void ApplyFilter()
+
+    private void ApplyFileFilter()
+    {
+        var filtered = LasFiles.AsEnumerable();
+
+        if (ShowOnlyUnknown)
+        {
+            // Only show files that have unknown or modified curves
+            filtered = filtered.Where(f => f.HasUnknown || f.HasModified);
+        }
+
+        if (!string.IsNullOrWhiteSpace(FilterText))
+        {
+            var filter = FilterText.ToLowerInvariant();
+            filtered = filtered.Where(f =>
+                f.FileName.Contains(filter, StringComparison.OrdinalIgnoreCase) ||
+                f.Curves.Any(c => c.CurveFieldName.Contains(filter, StringComparison.OrdinalIgnoreCase)));
+        }
+
+        FilteredFiles = new ObservableCollection<LasFileViewModel>(filtered);
+
+        // If currently selected file is no longer in filtered list, select first available
+        if (SelectedFile != null && !FilteredFiles.Contains(SelectedFile))
+        {
+            SelectedFile = FilteredFiles.FirstOrDefault();
+        }
+    }
+
+    private void ApplyCurveFilter()
     {
         if (SelectedFile == null)
         {
@@ -382,7 +432,7 @@ public partial class MainWindowViewModel : ObservableObject
         try
         {
             IsLoading = true;
-            StatusMessage = "Saving changes...";
+            StatusMessage = "Сохранение...";
 
             var modifiedCurves = new List<CurveRowViewModel>();
             var newBaseNames = new List<string>();
@@ -393,20 +443,27 @@ public partial class MainWindowViewModel : ObservableObject
                 modifiedCurves.AddRange(file.Curves.Where(c => c.IsModified));
             }
 
+            // Build a dictionary of new mappings for quick lookup
+            var newMappings = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            var newIgnored = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
             foreach (var curve in modifiedCurves)
             {
                 if (curve.PrimaryName == "[ИГНОРИРОВАТЬ]")
                 {
                     _aliasManager.AddAsIgnored(curve.CurveFieldName);
+                    newIgnored.Add(curve.CurveFieldName);
                 }
                 else if (curve.PrimaryName == "[НОВОЕ ИМЯ]")
                 {
                     _aliasManager.AddAsNewBase(curve.CurveFieldName);
                     newBaseNames.Add(curve.CurveFieldName);
+                    newMappings[curve.CurveFieldName] = curve.CurveFieldName;
                 }
                 else if (!string.IsNullOrEmpty(curve.PrimaryName))
                 {
                     _aliasManager.AddAsAlias(curve.CurveFieldName, curve.PrimaryName);
+                    newMappings[curve.CurveFieldName] = curve.PrimaryName;
                 }
             }
 
@@ -424,26 +481,50 @@ public partial class MainWindowViewModel : ObservableObject
                 }
             }
 
-            // Update all modified curves
-            foreach (var curve in modifiedCurves)
-            {
-                curve.OriginalPrimaryName = curve.PrimaryName;
-                curve.IsModified = false;
-                curve.IsUnknown = string.IsNullOrEmpty(curve.PrimaryName);
-                curve.IsIgnored = curve.PrimaryName == "[ИГНОРИРОВАТь]";
-            }
-
-            // Refresh file statuses
-            int totalUnknown = 0;
+            // Update ALL curves across ALL files that match the new mappings
             foreach (var file in LasFiles)
             {
+                foreach (var curve in file.Curves)
+                {
+                    var fieldName = curve.CurveFieldName;
+
+                    // Check if this curve was just mapped
+                    if (newMappings.TryGetValue(fieldName, out var primaryName))
+                    {
+                        curve.OriginalPrimaryName = primaryName;
+                        curve.PrimaryName = primaryName;
+                        curve.IsModified = false;
+                        curve.IsUnknown = false;
+                        curve.IsIgnored = false;
+                    }
+                    else if (newIgnored.Contains(fieldName))
+                    {
+                        curve.OriginalPrimaryName = "[ИГНОРИРОВАТЬ]";
+                        curve.PrimaryName = "[ИГНОРИРОВАТЬ]";
+                        curve.IsModified = false;
+                        curve.IsUnknown = false;
+                        curve.IsIgnored = true;
+                    }
+                    else if (curve.IsModified)
+                    {
+                        // This was a modified curve that we already processed
+                        curve.OriginalPrimaryName = curve.PrimaryName;
+                        curve.IsModified = false;
+                        curve.IsUnknown = string.IsNullOrEmpty(curve.PrimaryName);
+                        curve.IsIgnored = curve.PrimaryName == "[ИГНОРИРОВАТЬ]";
+                    }
+                }
+
                 file.RefreshStatus();
-                totalUnknown += file.UnknownCount;
             }
-            UnknownCurves = totalUnknown;
+
+            // Update totals
+            UnknownCurves = LasFiles.Sum(f => f.UnknownCount);
 
             HasUnsavedChanges = false;
-            StatusMessage = $"Saved {modifiedCurves.Count} changes successfully";
+            ApplyFileFilter();
+            ApplyCurveFilter();
+            StatusMessage = $"Сохранено {modifiedCurves.Count} изменений";
         }
         catch (Exception ex)
         {
@@ -454,15 +535,16 @@ public partial class MainWindowViewModel : ObservableObject
             IsLoading = false;
         }
     }
-
-    [RelayCommand]
+    
+   [RelayCommand]
     private void RefreshView()
     {
-        ApplyFilter();
         foreach (var file in LasFiles)
         {
             file.RefreshStatus();
         }
+        ApplyFileFilter();
+        ApplyCurveFilter();
     }
 
     private void UpdateHasUnsavedChanges()
@@ -483,6 +565,7 @@ public partial class MainWindowViewModel : ObservableObject
         }
 
         UpdateHasUnsavedChanges();
-        ApplyFilter();
+        ApplyFileFilter();
+        ApplyCurveFilter();
     }
 }
