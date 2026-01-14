@@ -1,4 +1,4 @@
-using LasAliasManager.Core.Models;
+﻿using LasAliasManager.Core.Models;
 
 namespace LasAliasManager.Core.Services;
 
@@ -188,6 +188,7 @@ public class AliasManager
             result.TotalCurves = content.Curves.Count;
             result.WellInfo = content.WellInfo;
             result.FileSize = content.FileSize;
+            result.CurveDefinitions = content.Curves;
 
             foreach (var curve in content.Curves)
             {
@@ -346,7 +347,9 @@ public class LasAnalysisResult
     public long FileSize { get; set; }
     public int TotalCurves { get; set; }
     public LasFileParser.WellInfo WellInfo { get; set; } = new();
-    
+
+    public List<LasFileParser.CurveDefinition> CurveDefinitions { get; set; } = new();
+
     /// <summary>
     /// Curves that were mapped to base names
     /// Key: base name, Value: list of field names found
@@ -371,6 +374,11 @@ public class LasAnalysisResult
     public bool HasUnknown => UnknownCurves.Count > 0;
     public bool HasError => !string.IsNullOrEmpty(Error);
 
+    public LasFileParser.CurveDefinition? GetCurveDefinition(string mnemonic)
+    {
+        return CurveDefinitions.FirstOrDefault(c =>
+            c.Mnemonic.Equals(mnemonic, StringComparison.OrdinalIgnoreCase));
+    }
     public override string ToString()
     {
         if (HasError)

@@ -22,6 +22,18 @@ public partial class CurveRowViewModel : ObservableObject
     private string _curveFieldName = string.Empty;
 
     /// <summary>
+    /// Description/comment of the curve from the LAS file
+    /// </summary>
+    [ObservableProperty]
+    private string _curveDescription = string.Empty;
+
+    /// <summary>
+    /// Units of the curve from the LAS file
+    /// </summary>
+    [ObservableProperty]
+    private string _curveUnits = string.Empty;
+
+    /// <summary>
     /// The selected primary (base) name from the dropdown
     /// </summary>
     [ObservableProperty]
@@ -108,6 +120,12 @@ public partial class CurveRowViewModel : ObservableObject
     private bool _isIgnored;
 
     /// <summary>
+    /// Whether this curve is selected for export (checkbox)
+    /// </summary>
+    [ObservableProperty]
+    private bool _isSelectedForExport;
+
+    /// <summary>
     /// Status text for display
     /// </summary>
     public string StatusText
@@ -131,11 +149,21 @@ public partial class CurveRowViewModel : ObservableObject
     /// </summary>
     public Action? OnModificationChanged { get; set; }
 
+    /// <summary>
+    /// Callback when selection for export changes
+    /// </summary>
+    public Action? OnSelectionForExportChanged { get; set; }
+
     partial void OnPrimaryNameChanged(string? value)
     {
         IsModified = value != OriginalPrimaryName;
         OnPropertyChanged(nameof(StatusText));
         OnModificationChanged?.Invoke();
+    }
+
+    partial void OnIsSelectedForExportChanged(bool value)
+    {
+        OnSelectionForExportChanged?.Invoke();
     }
 
     partial void OnIsModifiedChanged(bool value)

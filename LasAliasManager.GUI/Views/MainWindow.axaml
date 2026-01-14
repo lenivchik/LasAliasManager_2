@@ -11,7 +11,7 @@
         MinWidth="900" MinHeight="500"
         WindowStartupLocation="CenterScreen">
     
-    <Grid RowDefinitions="Auto,Auto,Auto,*,Auto">
+    <Grid RowDefinitions="Auto,Auto,Auto,*,Auto,Auto">
         <!-- Row 0: Menu Bar -->
         <Menu Grid.Row="0">
             <MenuItem Header="Файл">
@@ -21,11 +21,15 @@
                 <MenuItem Header="Сохранить изменения" Command="{Binding SaveChangesCommand}" 
                           IsEnabled="{Binding HasUnsavedChanges}"/>
                 <Separator/>
+                <MenuItem Header="Export _Selected to TXT..." Click="ExportSelectedCurves_Click"/>
                 <MenuItem Header="Выход" Click="Exit_Click"/>
             </MenuItem>
             <MenuItem Header="Изменить">
                 <MenuItem Header="Обновить страницу" Command="{Binding RefreshViewCommand}"/>
                 <MenuItem Header="Очистить все изменения" Command="{Binding ClearAllChangesCommand}"/>
+                <Separator/>
+                <MenuItem Header="Выбрать все в файле" Command="{Binding SelectAllCurvesCommand}"/>
+                <MenuItem Header="Отменить выбор" Command="{Binding DeselectAllCurvesCommand}"/>
             </MenuItem>
             <MenuItem Header="Помощь">
                 <MenuItem Header="О программе" Click="About_Click"/>
@@ -137,7 +141,7 @@
                     <DataGrid Grid.Row="2"
                               x:Name="CurvesGrid"
                               ItemsSource="{Binding FilteredCurves}"
-                              AutoGenerateColumns="False"
+                              SelectedItem="{Binding SelectedCurveRow, Mode=TwoWay}"
                               CanUserResizeColumns="True"
                               CanUserReorderColumns="True"
                               CanUserSortColumns="True"
@@ -147,6 +151,19 @@
                               Background="White">
                         
                         <DataGrid.Columns>
+                            
+                            <!-- Selection CheckBox -->
+                            <DataGridTemplateColumn Header="Экспорт">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate x:DataType="vm:CurveRowViewModel">
+                                        <CheckBox IsChecked="{Binding IsSelectedForExport, Mode=TwoWay}"
+                                                  HorizontalAlignment="Center"
+                                                  VerticalAlignment="Center"/>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+
+
                             <!-- Curve Field Name -->
                             <DataGridTextColumn Header="Полевое имя" 
                                                 Binding="{Binding CurveFieldName}"
@@ -170,8 +187,18 @@
             </Border>
         </Grid>
 
+                <!-- Row 4: Curve Info Panel -->
+        <Border Grid.Row="4" Background="#F5F5DC" Padding="8,4" 
+                IsVisible="{Binding SelectedCurveInfo, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+            <TextBlock Text="{Binding SelectedCurveInfo}" 
+                       FontStyle="Italic"
+                       TextWrapping="Wrap"/>
+        </Border>
+
+
+
         <!-- Row 4: Status Bar -->
-        <Border Grid.Row="4" Background="#E0E0E0" Padding="8,4">
+        <Border Grid.Row="5" Background="#E0E0E0" Padding="8,4">
             <StackPanel Orientation="Horizontal">
                 <TextBlock Text="{Binding StatusMessage}" VerticalAlignment="Center" TextWrapping="Wrap" Width="500"/>
                 <TextBlock Text="{Binding TotalFiles, StringFormat='Файлов: {0}'}" 

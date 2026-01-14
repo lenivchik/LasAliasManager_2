@@ -5,6 +5,8 @@ using LasAliasManager.GUI.ViewModels;
 using MsBox.Avalonia;
 using MsBox.Avalonia.Enums;
 using System;
+using System.IO;
+using System.Threading.Tasks;
 
 namespace LasAliasManager.GUI.Views;
 
@@ -18,17 +20,30 @@ public partial class MainWindow : Window
         InitializeComponent();
         DataContext = new MainWindowViewModel();
     }
+    private async Task<IStorageFolder?> GetAppDirectoryAsync()
+    {
+        var topLevel = GetTopLevel(this);
+        if (topLevel == null) return null;
 
+        var appDir = AppDomain.CurrentDomain.BaseDirectory;
+        if (Directory.Exists(appDir))
+        {
+            return await topLevel.StorageProvider.TryGetFolderFromPathAsync(appDir);
+        }
+        return null;
+    }
     private async void LoadDatabase_Click(object? sender, RoutedEventArgs e)
     {
         var topLevel = GetTopLevel(this);
         if (topLevel == null) return;
+        var startLocation = await GetAppDirectoryAsync();
 
         // Let user choose CSV or TXT file
         var files = await topLevel.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
         {
             Title = "Выберите файл с БД (CSV)",
             AllowMultiple = false,
+            SuggestedStartLocation = startLocation,
             FileTypeFilter = new[]
             {
                 new FilePickerFileType("CSV Files") { Patterns = new[] { "*.csv" } }
@@ -81,6 +96,48 @@ public partial class MainWindow : Window
             MsBox.Avalonia.Enums.Icon.Info);
         
         await box.ShowAsync();
+    }
+
+    //private async void ExportListNamesAlias_Click(object? sender, RoutedEventArgs e)
+    //{
+    //    var topLevel = GetTopLevel(this);
+    //    if (topLevel == null) return;
+
+    //    var file = await topLevel.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+    //    {
+    //        Title = "Export User-Defined to ListNamesAlias.txt",
+    //        DefaultExtension = "txt",
+    //        SuggestedFileName = "ListNamesAlias.txt",
+    //        FileTypeChoices = new[]
+    //        {
+    //            new FilePickerFileType("Text Files") { Patterns = new[] { "*.txt" } }
+    //        }
+    //    });
+
+    //    if (file == null) return;
+
+    //    await ViewModel.ExportListNamesAliasCommand.ExecuteAsync(file.Path.LocalPath);
+    //}
+
+    private async void ExportSelectedCurves_Click(object? sender, RoutedEventArgs e)
+    {
+        var topLevel = GetTopLevel(this);
+        if (topLevel == null) return;
+
+        var file = await topLevel.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+        {
+            Title = "Export Selected Curves to TXT",
+            DefaultExtension = "txt",
+            SuggestedFileName = "ListNamesAlias.txt",
+            FileTypeChoices = new[]
+            {
+                new FilePickerFileType("Text Files") { Patterns = new[] { "*.txt" } }
+            }
+        });
+
+        if (file == null) return;
+
+        await ViewModel.ExportSelectedCurvesCommand.ExecuteAsync(file.Path.LocalPath);
     }
 
     protected override async void OnClosing(WindowClosingEventArgs e)

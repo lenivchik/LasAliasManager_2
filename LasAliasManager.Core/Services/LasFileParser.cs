@@ -43,7 +43,6 @@ public class LasFileParser
         public string FilePath { get; set; } = string.Empty;
         public string FileName => Path.GetFileName(FilePath);
         public long FileSize { get; set; }
-        public Dictionary<string, string> VersionInfo { get; set; } = new();
         public WellInfo WellInfo { get; set; } = new();
         public List<CurveDefinition> Curves { get; set; } = new();
         public List<string> CurveNames => Curves.Select(c => c.Mnemonic).ToList();
@@ -83,7 +82,6 @@ public class LasFileParser
             switch (currentSection)
             {
                 case "VERSION":
-                    ParseInfoLine(trimmed, result.VersionInfo);
                     break;
                 case "WELL":
                     ParseWellInfoLine(trimmed, wellInfoDict);

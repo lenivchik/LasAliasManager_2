@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -13,6 +14,18 @@ public partial class MainWindowViewModel : ObservableObject
 {
     private readonly AliasManager _aliasManager;
 
+    /// <summary>
+    /// Tracks mappings defined by the user during this session (FieldName -> PrimaryName)
+    /// </summary>
+    private readonly Dictionary<string, string> _userDefinedMappings = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Tracks names the user marked as ignored during this session
+    /// </summary>
+    private readonly HashSet<string> _userDefinedIgnored = new(StringComparer.OrdinalIgnoreCase);
+
+
+
     [ObservableProperty]
     private ObservableCollection<LasFileViewModel> _lasFiles = new();
 
@@ -24,6 +37,9 @@ public partial class MainWindowViewModel : ObservableObject
 
     [ObservableProperty]
     private ObservableCollection<CurveRowViewModel> _filteredCurves = new();
+
+    [ObservableProperty]
+    private int _selectedForExportCount;
 
     [ObservableProperty]
     private ObservableCollection<string> _availablePrimaryNames = new();
@@ -61,9 +77,36 @@ public partial class MainWindowViewModel : ObservableObject
     [ObservableProperty]
     private string _filterText = string.Empty;
 
+    [ObservableProperty]
+    private CurveRowViewModel? _selectedCurveRow;
+
+    [ObservableProperty]
+    private string _selectedCurveInfo = string.Empty;
+
+    /// <summary>
+    /// Number of user-defined mappings available for export
+    /// </summary>
+    public int UserDefinedCount => _userDefinedMappings.Count + _userDefinedIgnored.Count;
     public string? AliasFilePath => _aliasManager.AliasFilePath;
     public string? IgnoredFilePath => _aliasManager.IgnoredFilePath;
     public DatabaseFormat CurrentFormat => _aliasManager.CurrentFormat;
+
+    partial void OnSelectedCurveRowChanged(CurveRowViewModel? value)
+    {
+        if (value != null)
+        {
+            var info = $"Кривая: {value.CurveFieldName}";
+            if (!string.IsNullOrWhiteSpace(value.CurveUnits))
+                info += $"  |  Единицы измерения: {value.CurveUnits}";
+            if (!string.IsNullOrWhiteSpace(value.CurveDescription))
+                info += $"  |  Описание: {value.CurveDescription}";
+            SelectedCurveInfo = info;
+        }
+        else
+        {
+            SelectedCurveInfo = string.Empty;
+        }
+    }
 
     public MainWindowViewModel()
     {
@@ -190,37 +233,7 @@ public partial class MainWindowViewModel : ObservableObject
 
 
 
-    [RelayCommand]
-    private async Task LoadTxtDatabaseAsync(string[]? paths)
-    {
-        if (paths == null || paths.Length < 2)
-            return;
-
-        try
-        {
-            IsLoading = true;
-            StatusMessage = "Loading TXT database...";
-
-            await Task.Run(() =>
-            {
-                _aliasManager.LoadFromTxt(paths[0], paths[1]);
-            });
-
-            DatabaseFilePath = paths[0];
-            RefreshAvailablePrimaryNames();
-
-            var stats = _aliasManager.Database.GetStatistics();
-            StatusMessage = $"TXT loaded: {stats.BaseCount} base names, {stats.TotalAliases} aliases, {stats.IgnoredCount} ignored";
-        }
-        catch (Exception ex)
-        {
-            StatusMessage = $"Error loading TXT: {ex.Message}";
-        }
-        finally
-        {
-            IsLoading = false;
-        }
-    }
+  
 
     private void RefreshAvailablePrimaryNames()
     {
@@ -276,6 +289,12 @@ public partial class MainWindowViewModel : ObservableObject
                     foreach (var fieldName in mapped.Value)
                     {
                         var row = CreateCurveRow(fieldName, fileVm);
+                        var curveDef = result.GetCurveDefinition(fieldName);
+                        if (curveDef != null)
+                        {
+                            row.CurveDescription = curveDef.Description;
+                            row.CurveUnits = curveDef.Units;
+                        }
                         row.OriginalPrimaryName = mapped.Key;
                         row.PrimaryName = mapped.Key;
                         row.IsUnknown = false;
@@ -288,6 +307,12 @@ public partial class MainWindowViewModel : ObservableObject
                 foreach (var ignored in result.IgnoredCurves)
                 {
                     var row = CreateCurveRow(ignored, fileVm);
+                    var curveDef = result.GetCurveDefinition(ignored);
+                    if (curveDef != null)
+                    {
+                        row.CurveDescription = curveDef.Description;
+                        row.CurveUnits = curveDef.Units;
+                    }
                     row.OriginalPrimaryName = "[ИГНОРИРОВАТЬ]";
                     row.PrimaryName = "[ИГНОРИРОВАТЬ]";
                     row.IsUnknown = false;
@@ -299,6 +324,12 @@ public partial class MainWindowViewModel : ObservableObject
                 foreach (var unknown in result.UnknownCurves)
                 {
                     var row = CreateCurveRow(unknown, fileVm);
+                    var curveDef = result.GetCurveDefinition(unknown);
+                    if (curveDef != null)
+                    {
+                        row.CurveDescription = curveDef.Description;
+                        row.CurveUnits = curveDef.Units;
+                    }
                     row.OriginalPrimaryName = "";
                     row.PrimaryName = "";
                     row.IsUnknown = true;
@@ -362,9 +393,20 @@ public partial class MainWindowViewModel : ObservableObject
             }
         };
 
+        // Wire up selection for export callback
+        row.OnSelectionForExportChanged = () =>
+        {
+            UpdateSelectedForExportCount();
+        };
+
         return row;
     }
 
+
+    private void UpdateSelectedForExportCount()
+    {
+        SelectedForExportCount = LasFiles.Sum(f => f.Curves.Count(c => c.IsSelectedForExport));
+    }
 
     private void ApplyFileFilter()
     {
@@ -567,5 +609,183 @@ public partial class MainWindowViewModel : ObservableObject
         UpdateHasUnsavedChanges();
         ApplyFileFilter();
         ApplyCurveFilter();
+    }
+
+    [RelayCommand]
+    private void ClearExportHistory()
+    {
+        _userDefinedMappings.Clear();
+        _userDefinedIgnored.Clear();
+        OnPropertyChanged(nameof(UserDefinedCount));
+        StatusMessage = "Export history cleared";
+    }
+
+    [RelayCommand]
+    private async Task ExportListNamesAliasAsync(string? filePath)
+    {
+        if (string.IsNullOrEmpty(filePath))
+            return;
+
+        if (_userDefinedMappings.Count == 0 && _userDefinedIgnored.Count == 0)
+        {
+            StatusMessage = "No user-defined mappings to export. Save changes first.";
+            return;
+        }
+
+        try
+        {
+            IsLoading = true;
+            StatusMessage = "Exporting to ListNamesAlias.txt...";
+
+            await Task.Run(() =>
+            {
+                var exporter = new ListNamesAliasExporter();
+
+                // Convert user-defined mappings to the format expected by exporter
+                // Group by PrimaryName
+                var userAliases = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+
+                foreach (var kvp in _userDefinedMappings)
+                {
+                    var fieldName = kvp.Key;
+                    var primaryName = kvp.Value;
+
+                    if (!userAliases.ContainsKey(primaryName))
+                    {
+                        userAliases[primaryName] = new List<string>();
+                    }
+
+                    if (!userAliases[primaryName].Contains(fieldName, StringComparer.OrdinalIgnoreCase))
+                    {
+                        userAliases[primaryName].Add(fieldName);
+                    }
+                }
+
+                // If file exists, append and sort; otherwise create new
+                if (File.Exists(filePath))
+                {
+                    exporter.AppendAndSort(filePath, userAliases, _userDefinedIgnored);
+                }
+                else
+                {
+                    exporter.Export(filePath, userAliases, _userDefinedIgnored);
+                }
+            });
+
+            var count = _userDefinedMappings.Count + _userDefinedIgnored.Count;
+            StatusMessage = $"Exported {count} user-defined entries to {Path.GetFileName(filePath)}";
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Error exporting: {ex.Message}";
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    [RelayCommand]
+    private async Task ExportSelectedCurvesAsync(string? filePath)
+    {
+        if (string.IsNullOrEmpty(filePath))
+            return;
+
+        var selectedCurves = LasFiles
+            .SelectMany(f => f.Curves)
+            .Where(c => c.IsSelectedForExport && !string.IsNullOrEmpty(c.PrimaryName) && c.PrimaryName != "[IGNORE]")
+            .ToList();
+
+        var ignoredCurves = LasFiles
+            .SelectMany(f => f.Curves)
+            .Where(c => c.IsSelectedForExport && c.PrimaryName == "[IGNORE]")
+            .ToList();
+
+        if (selectedCurves.Count == 0 && ignoredCurves.Count == 0)
+        {
+            StatusMessage = "No curves selected for export. Use checkboxes to select curves.";
+            return;
+        }
+
+        try
+        {
+            IsLoading = true;
+            StatusMessage = "Exporting selected curves...";
+
+            await Task.Run(() =>
+            {
+                var exporter = new ListNamesAliasExporter();
+
+                // Group selected curves by PrimaryName
+                var aliases = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+
+                foreach (var curve in selectedCurves)
+                {
+                    var primaryName = curve.PrimaryName!;
+                    var fieldName = curve.CurveFieldName;
+
+                    if (!aliases.ContainsKey(primaryName))
+                    {
+                        aliases[primaryName] = new List<string>();
+                    }
+
+                    if (!aliases[primaryName].Contains(fieldName, StringComparer.OrdinalIgnoreCase))
+                    {
+                        aliases[primaryName].Add(fieldName);
+                    }
+                }
+
+                // Collect ignored curve names
+                var ignored = new HashSet<string>(
+                    ignoredCurves.Select(c => c.CurveFieldName),
+                    StringComparer.OrdinalIgnoreCase);
+
+                // If file exists, append and sort; otherwise create new
+                if (File.Exists(filePath))
+                {
+                    exporter.AppendAndSort(filePath, aliases, ignored);
+                }
+                else
+                {
+                    exporter.Export(filePath, aliases, ignored);
+                }
+            });
+
+            var totalCount = selectedCurves.Count + ignoredCurves.Count;
+            StatusMessage = $"Exported {totalCount} selected curves to {Path.GetFileName(filePath)}";
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Error exporting: {ex.Message}";
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    [RelayCommand]
+    private void SelectAllCurves()
+    {
+        if (SelectedFile == null) return;
+
+        foreach (var curve in SelectedFile.Curves)
+        {
+            curve.IsSelectedForExport = true;
+        }
+        UpdateSelectedForExportCount();
+    }
+
+    [RelayCommand]
+    private void DeselectAllCurves()
+    {
+        foreach (var file in LasFiles)
+        {
+            foreach (var curve in file.Curves)
+            {
+                curve.IsSelectedForExport = false;
+            }
+        }
+        UpdateSelectedForExportCount();
     }
 }
