@@ -703,14 +703,14 @@ public partial class MainWindowViewModel : ObservableObject
 
         if (selectedCurves.Count == 0 && ignoredCurves.Count == 0)
         {
-            StatusMessage = "No curves selected for export. Use checkboxes to select curves.";
+            StatusMessage = "Нет выбранных кривых для экспорта.";
             return;
         }
 
         try
         {
             IsLoading = true;
-            StatusMessage = "Exporting selected curves...";
+            StatusMessage = "Экспорт...";
 
             await Task.Run(() =>
             {

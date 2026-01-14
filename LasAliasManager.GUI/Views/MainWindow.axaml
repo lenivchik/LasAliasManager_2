@@ -21,7 +21,7 @@
                 <MenuItem Header="Сохранить изменения" Command="{Binding SaveChangesCommand}" 
                           IsEnabled="{Binding HasUnsavedChanges}"/>
                 <Separator/>
-                <MenuItem Header="Export _Selected to TXT..." Click="ExportSelectedCurves_Click"/>
+                <MenuItem Header="Экспортировать в txt..." Click="ExportSelectedCurves_Click"/>
                 <MenuItem Header="Выход" Click="Exit_Click"/>
             </MenuItem>
             <MenuItem Header="Изменить">
@@ -207,6 +207,8 @@
                            Margin="16,0" VerticalAlignment="Center"/>
                 <TextBlock Text="{Binding UnknownCurves, StringFormat='Неизвестных: {0}'}" 
                            Margin="16,0" VerticalAlignment="Center" Foreground="Orange"/>
+                <TextBlock Text="{Binding SelectedForExportCount, StringFormat='Выбрано: {0}'}" 
+                           Margin="16,0" VerticalAlignment="Center" Foreground="Blue"/>
                 <ProgressBar IsIndeterminate="True" Width="100" 
                              IsVisible="{Binding IsLoading}" Margin="16,0,0,0"/>
             </StackPanel>

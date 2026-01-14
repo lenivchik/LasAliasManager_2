@@ -132,7 +132,7 @@ public class ListNamesAliasExporter
         if (!File.Exists(filePath))
             return entries;
 
-        var lines = ReadFileLines(filePath);
+        var lines = ReadFileLinesAnsi(filePath);
         bool headerPassed = false;
 
         foreach (var line in lines)
@@ -149,7 +149,7 @@ public class ListNamesAliasExporter
                 continue;
             }
 
-            if (trimmed.StartsWith("Основное") || trimmed.StartsWith("имя") || trimmed.StartsWith("Îñíîâíîå"))
+            if (trimmed.StartsWith("Основное") || trimmed.StartsWith("имя"))
                 continue;
 
             if (!headerPassed)
@@ -163,7 +163,7 @@ public class ListNamesAliasExporter
 
                 // Field name is everything after primary name, but before ":" if present
                 var restOfLine = trimmed.Substring(primaryName.Length).Trim();
-                var colonIndex = restOfLine.IndexOf(':');
+                var colonIndex = restOfLine.IndexOf('.');
                 var fieldName = colonIndex > 0
                     ? restOfLine.Substring(0, colonIndex).Trim()
                     : restOfLine.Trim();
@@ -215,6 +215,14 @@ public class ListNamesAliasExporter
         var latin1 = Encoding.Latin1;
         var content = latin1.GetString(bytes);
         return content.Split('\n').Select(l => l.TrimEnd('\r')).ToList();
+
+    }
+    private List<string> ReadFileLinesAnsi(string filePath)
+    {
+        var ansi = Encoding.GetEncoding(1251);
+
+        var text = File.ReadAllText(filePath, ansi);
+        return text.Split('\n').Select(l => l.TrimEnd('\r')).ToList();
 
     }
 }

@@ -126,7 +126,7 @@ public partial class MainWindow : Window
 
         var file = await topLevel.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
         {
-            Title = "Export Selected Curves to TXT",
+            Title = "Экспортировать выбранные кривые",
             DefaultExtension = "txt",
             SuggestedFileName = "ListNamesAlias.txt",
             FileTypeChoices = new[]
