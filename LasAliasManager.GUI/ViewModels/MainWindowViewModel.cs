@@ -752,7 +752,7 @@ public partial class MainWindowViewModel : ObservableObject
             });
 
             var totalCount = selectedCurves.Count + ignoredCurves.Count;
-            StatusMessage = $"Exported {totalCount} selected curves to {Path.GetFileName(filePath)}";
+            StatusMessage = $"Экспортировано {totalCount} кривых в {Path.GetFileName(filePath)}";
         }
         catch (Exception ex)
         {
