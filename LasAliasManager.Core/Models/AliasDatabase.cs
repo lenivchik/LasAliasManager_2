@@ -60,12 +60,20 @@ public class AliasDatabase
     /// </summary>
     public bool AddAliasToBase(string baseName, string fieldName)
     {
+        var trimmedFieldName = fieldName.Trim();
+
+        // Remove from ignored list if present (prevents duplicate records)
+        IgnoredNames.Remove(trimmedFieldName);
+
+        // Remove from any other base name's aliases (in case it was mapped elsewhere)
+        RemoveFieldNameFromAllAliases(trimmedFieldName);
+
         if (!Aliases.TryGetValue(baseName, out var curveAlias))
         {
             curveAlias = new CurveAlias(baseName);
             Aliases[baseName] = curveAlias;
         }
-        return curveAlias.AddAlias(fieldName);
+        return curveAlias.AddAlias(trimmedFieldName);
     }
 
     /// <summary>
@@ -91,9 +99,23 @@ public class AliasDatabase
     /// </summary>
     public bool AddIgnored(string name)
     {
-        return IgnoredNames.Add(name.Trim());
-    }
+        var trimmed = name.Trim();
 
+        // Remove from all aliases (prevents duplicate records)
+        RemoveFieldNameFromAllAliases(trimmed);
+
+        return IgnoredNames.Add(trimmed);
+    }
+    /// <summary>
+    /// Removes a field name from all alias lists
+    /// </summary>
+    private void RemoveFieldNameFromAllAliases(string fieldName)
+    {
+        foreach (var kvp in Aliases)
+        {
+            kvp.Value.RemoveAlias(fieldName);
+        }
+    }
     /// <summary>
     /// Gets all base names
     /// </summary>

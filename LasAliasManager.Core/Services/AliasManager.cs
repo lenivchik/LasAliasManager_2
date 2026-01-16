@@ -7,7 +7,6 @@ namespace LasAliasManager.Core.Services;
 /// </summary>
 public class AliasManager
 {
-    private readonly AliasFileParser _txtParser;
     private readonly CsvAliasParser _csvParser;
     private readonly LasFileParser _lasParser;
 
@@ -17,19 +16,8 @@ public class AliasManager
     /// Current database file path (CSV or TXT)
     /// </summary>
     public string? DatabaseFilePath { get; private set; }
-
-    /// <summary>
-    /// Format of the loaded database
-    /// </summary>
-    public DatabaseFormat CurrentFormat { get; private set; } = DatabaseFormat.None;
-
-    // Legacy properties for TXT format compatibility
-    public string? AliasFilePath { get; private set; }
-    public string? IgnoredFilePath { get; private set; }
-
     public AliasManager()
     {
-        _txtParser = new AliasFileParser();
         _csvParser = new CsvAliasParser();
         _lasParser = new LasFileParser();
         Database = new AliasDatabase();
@@ -42,8 +30,6 @@ public class AliasManager
     {
         Database = new AliasDatabase();
         DatabaseFilePath = csvFilePath;
-        CurrentFormat = DatabaseFormat.CSV;
-
         var (aliases, ignored) = _csvParser.LoadCsvFile(csvFilePath);
 
         foreach (var kvp in aliases)
@@ -76,76 +62,6 @@ public class AliasManager
 
         _csvParser.SaveCsvFile(csvFilePath, aliases, Database.IgnoredNames);
         DatabaseFilePath = csvFilePath;
-        CurrentFormat = DatabaseFormat.CSV;
-    }
-
-    /// <summary>
-    /// Loads alias database from TXT files (legacy format)
-    /// </summary>
-    public void LoadFromTxt(string aliasFilePath, string ignoredFilePath)
-    {
-        Database = new AliasDatabase();
-        AliasFilePath = aliasFilePath;
-        IgnoredFilePath = ignoredFilePath;
-        CurrentFormat = DatabaseFormat.TXT;
-
-        var aliases = _txtParser.LoadAliasFile(aliasFilePath);
-        foreach (var kvp in aliases)
-        {
-            Database.AddBaseName(kvp.Key, kvp.Value);
-        }
-
-        var ignored = _txtParser.LoadIgnoredFile(ignoredFilePath);
-        foreach (var name in ignored)
-        {
-            Database.AddIgnored(name);
-        }
-    }
-
-    /// <summary>
-    /// Saves the current database to TXT files (legacy format)
-    /// </summary>
-    public void SaveToTxt(string? aliasFilePath = null, string? ignoredFilePath = null)
-    {
-        aliasFilePath ??= AliasFilePath;
-        ignoredFilePath ??= IgnoredFilePath;
-
-        if (string.IsNullOrEmpty(aliasFilePath) || string.IsNullOrEmpty(ignoredFilePath))
-        {
-            throw new InvalidOperationException("TXT file paths not specified");
-        }
-
-        var aliases = Database.Aliases.ToDictionary(
-            k => k.Key,
-            v => v.Value.FieldNames
-        );
-
-        _txtParser.SaveAliasFile(aliasFilePath, aliases, Database.IgnoredNames);
-        _txtParser.SaveIgnoredFile(ignoredFilePath, Database.IgnoredNames);
-
-        AliasFilePath = aliasFilePath;
-        IgnoredFilePath = ignoredFilePath;
-    }
-
-    /// <summary>
-    /// Loads alias database from files (auto-detects format by extension)
-    /// For CSV: single file path
-    /// For TXT: aliasFilePath, ignoredFilePath
-    /// </summary>
-    public void LoadFromFiles(string filePath, string? ignoredFilePath = null)
-    {
-        if (filePath.EndsWith(".csv", StringComparison.OrdinalIgnoreCase))
-        {
-            LoadFromCsv(filePath);
-        }
-        else
-        {
-            if (string.IsNullOrEmpty(ignoredFilePath))
-            {
-                throw new ArgumentException("Ignored file path required for TXT format");
-            }
-            LoadFromTxt(filePath, ignoredFilePath);
-        }
     }
 
     /// <summary>
@@ -153,18 +69,11 @@ public class AliasManager
     /// </summary>
     public void SaveToFiles(string? filePath = null, string? ignoredFilePath = null)
     {
-        if (CurrentFormat == DatabaseFormat.CSV)
+        if (string.IsNullOrEmpty(DatabaseFilePath))
         {
-            SaveToCsv(filePath ?? DatabaseFilePath);
+            throw new InvalidOperationException("No database loaded. Load a database first.");
         }
-        else if (CurrentFormat == DatabaseFormat.TXT)
-        {
-            SaveToTxt(filePath ?? AliasFilePath, ignoredFilePath ?? IgnoredFilePath);
-        }
-        else
-        {
-            throw new InvalidOperationException("No database format set. Load a database first.");
-        }
+        SaveToCsv(DatabaseFilePath);
     }
 
     /// <summary>
@@ -409,14 +318,4 @@ public class UnknownCurveInfo
     {
         return $"{CurveName} (from: {SourceFilePath})";
     }
-}
-
-/// <summary>
-/// Database file format
-/// </summary>
-public enum DatabaseFormat
-{
-    None,
-    CSV,
-    TXT
 }

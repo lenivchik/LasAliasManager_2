@@ -1,4 +1,4 @@
-namespace LasAliasManager.Core.Models;
+﻿namespace LasAliasManager.Core.Models;
 
 /// <summary>
 /// Represents a base curve name with all its field name aliases
@@ -51,6 +51,22 @@ public class CurveAlias
     public bool IsAlias(string fieldName)
     {
         return FieldNames.Contains(fieldName.Trim(), StringComparer.OrdinalIgnoreCase);
+    }
+
+
+    /// <summary>
+    /// Removes a field name alias if it exists
+    /// </summary>
+    public bool RemoveAlias(string fieldName)
+    {
+        var trimmed = fieldName.Trim();
+        var index = FieldNames.FindIndex(f => f.Equals(trimmed, StringComparison.OrdinalIgnoreCase));
+        if (index >= 0)
+        {
+            FieldNames.RemoveAt(index);
+            return true;
+        }
+        return false;
     }
 
     public override string ToString()

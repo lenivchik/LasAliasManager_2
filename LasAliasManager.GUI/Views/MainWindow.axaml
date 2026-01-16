@@ -18,7 +18,7 @@
                 <MenuItem Header="Загрузить базу данных..." Click="LoadDatabase_Click"/>
                 <MenuItem Header="Загрузить директорию..." Click="LoadFolder_Click"/>
                 <Separator/>
-                <MenuItem Header="Сохранить изменения" Command="{Binding SaveChangesCommand}" 
+                <MenuItem Header="Сохранить изменения в БД" Command="{Binding SaveChangesCommand}" 
                           IsEnabled="{Binding HasUnsavedChanges}"/>
                 <Separator/>
                 <MenuItem Header="Экспортировать в txt..." Click="ExportSelectedCurves_Click"/>
@@ -44,7 +44,7 @@
                 <Button Content="Выбрать директорию" Click="LoadFolder_Click"
                         ToolTip.Tip="Выбрать папку с Las файлами"/>
                 <Rectangle Width="1" Fill="Gray" Margin="4,0"/>
-                <Button Content="Сохранить" Command="{Binding SaveChangesCommand}"
+                <Button Content="Сохранить изменения в БД" Command="{Binding SaveChangesCommand}"
                         IsEnabled="{Binding HasUnsavedChanges}"
                         ToolTip.Tip="Сохранить изменения в БД"/>
                 <Rectangle Width="1" Fill="Gray" Margin="4,0"/>

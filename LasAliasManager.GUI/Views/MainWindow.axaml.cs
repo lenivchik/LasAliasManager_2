@@ -81,17 +81,16 @@ public partial class MainWindow : Window
     private async void About_Click(object? sender, RoutedEventArgs e)
     {
         var box = MessageBoxManager.GetMessageBoxStandard(
-            "About LAS Curve Alias Manager",
+            "О программе",
             "LAS Curve Alias Manager v1.0\n\n" + 
             "A tool for managing curve name aliases in LAS files.\n\n" +
-            "Supported database formats:\n" +
-            "• CSV (recommended) - single file\n" +
-            "• TXT (legacy) - two files\n\n" +
-            "Features:\n" +
-            "• Load and analyze LAS files from folders\n" +
-            "• Map unknown curve names to standardized base names\n" +
-            "• View well information (STRT, STOP, STEP)\n" +
-            "• Save changes to alias database",
+            "Формат базы данных:\n" +
+            "• CSV - единичный файл\n" +
+            "Возможности:\n" +
+            "• Загрузка и анализ LAS файлов из папок/директорий\n" +
+            "• Связывание полевых и основных имен\n" +
+            "• Выгрузка в TXT файл\n" +
+            "• Сохранение иземенеий в БД",
             ButtonEnum.Ok,
             MsBox.Avalonia.Enums.Icon.Info);
         
@@ -126,9 +125,9 @@ public partial class MainWindow : Window
 
         var file = await topLevel.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
         {
-            Title = "Экспортировать выбранные кривые",
+            Title = "Экспорт выбранные кривые",
             DefaultExtension = "txt",
-            SuggestedFileName = "ListNamesAlias.txt",
+            SuggestedFileName = "ListNameAlias.txt",
             FileTypeChoices = new[]
             {
                 new FilePickerFileType("Text Files") { Patterns = new[] { "*.txt" } }

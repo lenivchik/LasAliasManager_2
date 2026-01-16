@@ -87,9 +87,8 @@ public partial class MainWindowViewModel : ObservableObject
     /// Number of user-defined mappings available for export
     /// </summary>
     public int UserDefinedCount => _userDefinedMappings.Count + _userDefinedIgnored.Count;
-    public string? AliasFilePath => _aliasManager.AliasFilePath;
-    public string? IgnoredFilePath => _aliasManager.IgnoredFilePath;
-    public DatabaseFormat CurrentFormat => _aliasManager.CurrentFormat;
+    public bool HasDatabase => !string.IsNullOrEmpty(_aliasManager.DatabaseFilePath);
+
 
     partial void OnSelectedCurveRowChanged(CurveRowViewModel? value)
     {
@@ -155,6 +154,9 @@ public partial class MainWindowViewModel : ObservableObject
 
             var stats = _aliasManager.Database.GetStatistics();
             StatusMessage = $"База данных загружена: {stats.BaseCount} Основных имен, {stats.TotalAliases} Полевых имен, {stats.IgnoredCount} Игнорируются";
+
+            // Re-analyze already loaded files if any
+
             if (!string.IsNullOrEmpty(CurrentFolderPath))
             {
                 await ReanalyzeLoadedFilesAsync();
@@ -465,7 +467,7 @@ public partial class MainWindowViewModel : ObservableObject
     [RelayCommand]
     private async Task SaveChangesAsync()
     {
-        if (_aliasManager.CurrentFormat == DatabaseFormat.None)
+        if ((!HasDatabase))
         {
             StatusMessage = "Error: No database loaded";
             return;
