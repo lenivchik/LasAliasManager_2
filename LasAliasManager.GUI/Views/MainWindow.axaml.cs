@@ -18,8 +18,37 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
-        DataContext = new MainWindowViewModel();
+        var viewModel = new MainWindowViewModel();
+        viewModel.ShowMessageDialog = ShowMessageDialogAsync;
+        DataContext = viewModel;
     }
+    /// <summary>
+    /// Shows a message dialog with appropriate icon based on message type
+    /// </summary>
+    /// 
+    private async void ShowMessageDialogAsync(string title, string message, MessageType type)
+    {
+        if (type == MessageType.Success)
+        {
+            // Custom success dialog with green checkmark
+            var dialog = new SuccessDialog(title, message);
+            await dialog.ShowDialog(this);
+        }
+        else
+        {
+            // Standard message box for other types
+            var icon = type switch
+            {
+                MessageType.Warning => MsBox.Avalonia.Enums.Icon.Warning,
+                MessageType.Error => MsBox.Avalonia.Enums.Icon.Error,
+                _ => MsBox.Avalonia.Enums.Icon.Info
+            };
+
+            var box = MessageBoxManager.GetMessageBoxStandard(title, message, ButtonEnum.Ok, icon);
+            await box.ShowWindowDialogAsync(this);
+        }
+    }
+
     private async Task<IStorageFolder?> GetAppDirectoryAsync()
     {
         var topLevel = GetTopLevel(this);
@@ -83,7 +112,6 @@ public partial class MainWindow : Window
         var box = MessageBoxManager.GetMessageBoxStandard(
             "О программе",
             "LAS Curve Alias Manager v1.0\n\n" + 
-            "A tool for managing curve name aliases in LAS files.\n\n" +
             "Формат базы данных:\n" +
             "• CSV - единичный файл\n" +
             "Возможности:\n" +
@@ -96,6 +124,82 @@ public partial class MainWindow : Window
         
         await box.ShowAsync();
     }
+
+    private async void ExportListNamesAlias_Click(object? sender, RoutedEventArgs e)
+    {
+        // Check if there are user-defined mappings before opening file picker
+        if (ViewModel.UserDefinedCount == 0)
+        {
+            var box = MessageBoxManager.GetMessageBoxStandard(
+                "Export",
+                "No user-defined mappings to export.\nSave changes first to track mappings.",
+                ButtonEnum.Ok,
+                 MsBox.Avalonia.Enums.Icon.Warning);
+            await box.ShowWindowDialogAsync(this);
+            return;
+        }
+
+        var topLevel = GetTopLevel(this);
+        if (topLevel == null) return;
+
+        // Get application directory as starting location
+        var startLocation = await GetAppDirectoryAsync();
+
+        var file = await topLevel.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+        {
+            Title = "Export User-Defined to ListNamesAlias.txt",
+            DefaultExtension = "txt",
+            SuggestedFileName = "ListNamesAlias.txt",
+            SuggestedStartLocation = startLocation,
+            FileTypeChoices = new[]
+            {
+                new FilePickerFileType("Text Files") { Patterns = new[] { "*.txt" } }
+            }
+        });
+
+        if (file == null) return;
+
+        await ViewModel.ExportListNamesAliasCommand.ExecuteAsync(file.Path.LocalPath);
+    }
+
+    private async void ExportSelectedCurves_Click(object? sender, RoutedEventArgs e)
+    {
+        // Check if curves are selected before opening file picker
+        if (ViewModel.SelectedForExportCount == 0)
+        {
+            var box = MessageBoxManager.GetMessageBoxStandard(
+                "Экспорт кривых",
+                "Нет выбранных кривых для экспорта.\n Проставьте (✓) чтобы выбрать кривые.",
+                ButtonEnum.Ok,
+                 MsBox.Avalonia.Enums.Icon.Warning);
+            await box.ShowWindowDialogAsync(this);
+            return;
+        }
+
+        var topLevel = GetTopLevel(this);
+        if (topLevel == null) return;
+
+        // Get application directory as starting location
+        var startLocation = await GetAppDirectoryAsync();
+
+        var file = await topLevel.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+        {
+            Title = "Экспорт выбранных кривых",
+            DefaultExtension = "txt",
+            SuggestedFileName = "ListNameAlias.txt",
+            SuggestedStartLocation = startLocation,
+            FileTypeChoices = new[]
+            {
+                new FilePickerFileType("Text Files") { Patterns = new[] { "*.txt" } }
+            }
+        });
+
+        if (file == null) return;
+
+        await ViewModel.ExportSelectedCurvesCommand.ExecuteAsync(file.Path.LocalPath);
+    }
+
+
 
     //private async void ExportListNamesAlias_Click(object? sender, RoutedEventArgs e)
     //{
@@ -118,26 +222,7 @@ public partial class MainWindow : Window
     //    await ViewModel.ExportListNamesAliasCommand.ExecuteAsync(file.Path.LocalPath);
     //}
 
-    private async void ExportSelectedCurves_Click(object? sender, RoutedEventArgs e)
-    {
-        var topLevel = GetTopLevel(this);
-        if (topLevel == null) return;
 
-        var file = await topLevel.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
-        {
-            Title = "Экспорт выбранные кривые",
-            DefaultExtension = "txt",
-            SuggestedFileName = "ListNameAlias.txt",
-            FileTypeChoices = new[]
-            {
-                new FilePickerFileType("Text Files") { Patterns = new[] { "*.txt" } }
-            }
-        });
-
-        if (file == null) return;
-
-        await ViewModel.ExportSelectedCurvesCommand.ExecuteAsync(file.Path.LocalPath);
-    }
 
     protected override async void OnClosing(WindowClosingEventArgs e)
     {

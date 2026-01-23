@@ -10,6 +10,7 @@
         Width="1400" Height="800"
         MinWidth="900" MinHeight="500"
         WindowStartupLocation="CenterScreen">
+
     
     <Grid RowDefinitions="Auto,Auto,Auto,*,Auto,Auto">
         <!-- Row 0: Menu Bar -->
@@ -149,7 +150,14 @@
                               IsReadOnly="False"
                               SelectionMode="Extended"
                               Background="White">
-                        
+                            <DataGrid.Styles>
+                                <Style Selector="DataGridColumnHeader">
+                                    <Setter Property="FontSize" Value="16"/>
+                                    <Setter Property="FontWeight" Value="Bold"/>
+                                    <Setter Property="Foreground" Value="DarkBlue"/>
+                                    <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                                </Style>
+                            </DataGrid.Styles>
                         <DataGrid.Columns>
                             
                             <!-- Selection CheckBox -->

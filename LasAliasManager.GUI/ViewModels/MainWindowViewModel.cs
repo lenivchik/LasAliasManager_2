@@ -10,6 +10,17 @@ using LasAliasManager.Core.Services;
 
 namespace LasAliasManager.GUI.ViewModels;
 
+/// <summary>
+/// Types of messages for user notifications
+/// </summary>
+public enum MessageType
+{
+    Info,
+    Success,
+    Warning,
+    Error
+}
+
 public partial class MainWindowViewModel : ObservableObject
 {
     private readonly AliasManager _aliasManager;
@@ -24,7 +35,10 @@ public partial class MainWindowViewModel : ObservableObject
     /// </summary>
     private readonly HashSet<string> _userDefinedIgnored = new(StringComparer.OrdinalIgnoreCase);
 
-
+    /// <summary>
+    /// Action to show message dialog (set by View)
+    /// </summary>
+    public Action<string, string, MessageType>? ShowMessageDialog { get; set; }
 
     [ObservableProperty]
     private ObservableCollection<LasFileViewModel> _lasFiles = new();
@@ -87,6 +101,12 @@ public partial class MainWindowViewModel : ObservableObject
     /// Number of user-defined mappings available for export
     /// </summary>
     public int UserDefinedCount => _userDefinedMappings.Count + _userDefinedIgnored.Count;
+
+    /// <summary>
+    /// Number of curves that have been exported
+    /// </summary>
+    public int ExportedCount => LasFiles.SelectMany(f => f.Curves).Count(c => c.IsExported);
+
     public bool HasDatabase => !string.IsNullOrEmpty(_aliasManager.DatabaseFilePath);
 
 
@@ -230,7 +250,7 @@ public partial class MainWindowViewModel : ObservableObject
         ApplyCurveFilter();
         UpdateHasUnsavedChanges();
 
-        StatusMessage = $"Re-analyzed {LasFiles.Count} files, {TotalCurves} curves ({UnknownCurves} unknown)";
+        StatusMessage = $"Пере-анализировано {LasFiles.Count} файлов, сопоставлено {TotalCurves} кривых ({UnknownCurves} неизвестных )";
     }
 
 
@@ -631,6 +651,7 @@ public partial class MainWindowViewModel : ObservableObject
         if (_userDefinedMappings.Count == 0 && _userDefinedIgnored.Count == 0)
         {
             StatusMessage = "No user-defined mappings to export. Save changes first.";
+            ShowMessageDialog?.Invoke("Export", "No user-defined mappings to export.\nSave changes first to track mappings.", MessageType.Warning);
             return;
         }
 
@@ -638,6 +659,9 @@ public partial class MainWindowViewModel : ObservableObject
         {
             IsLoading = true;
             StatusMessage = "Exporting to ListNamesAlias.txt...";
+
+            // Keep track of exported field names
+            var exportedFieldNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
             await Task.Run(() =>
             {
@@ -661,6 +685,14 @@ public partial class MainWindowViewModel : ObservableObject
                     {
                         userAliases[primaryName].Add(fieldName);
                     }
+
+                    exportedFieldNames.Add(fieldName);
+                }
+
+                // Add ignored names to exported set
+                foreach (var name in _userDefinedIgnored)
+                {
+                    exportedFieldNames.Add(name);
                 }
 
                 // If file exists, append and sort; otherwise create new
@@ -674,12 +706,29 @@ public partial class MainWindowViewModel : ObservableObject
                 }
             });
 
+            // Mark exported curves in UI
+            foreach (var file in LasFiles)
+            {
+                foreach (var curve in file.Curves)
+                {
+                    if (exportedFieldNames.Contains(curve.CurveFieldName))
+                    {
+                        curve.IsExported = true;
+                    }
+                }
+            }
+
+            // Update exported count
+            OnPropertyChanged(nameof(ExportedCount));
+
             var count = _userDefinedMappings.Count + _userDefinedIgnored.Count;
             StatusMessage = $"Exported {count} user-defined entries to {Path.GetFileName(filePath)}";
+            ShowMessageDialog?.Invoke("Export Successful", $"Exported {count} user-defined entries to:\n{filePath}", MessageType.Success);
         }
         catch (Exception ex)
         {
             StatusMessage = $"Error exporting: {ex.Message}";
+            ShowMessageDialog?.Invoke("Export Error", $"Failed to export:\n{ex.Message}", MessageType.Error);
         }
         finally
         {
@@ -695,24 +744,29 @@ public partial class MainWindowViewModel : ObservableObject
 
         var selectedCurves = LasFiles
             .SelectMany(f => f.Curves)
-            .Where(c => c.IsSelectedForExport && !string.IsNullOrEmpty(c.PrimaryName) && c.PrimaryName != "[IGNORE]")
+            .Where(c => c.IsSelectedForExport && !string.IsNullOrEmpty(c.PrimaryName) && c.PrimaryName != "[ИГНОРИРОВАТЬ]")
             .ToList();
 
         var ignoredCurves = LasFiles
             .SelectMany(f => f.Curves)
-            .Where(c => c.IsSelectedForExport && c.PrimaryName == "[IGNORE]")
+            .Where(c => c.IsSelectedForExport && c.PrimaryName == "[ИГНОРИРОВАТЬ]")
             .ToList();
 
         if (selectedCurves.Count == 0 && ignoredCurves.Count == 0)
         {
-            StatusMessage = "Нет выбранных кривых для экспорта.";
+            StatusMessage = "У выбранных кривых отсутсвуют базовые имена.";
+            ShowMessageDialog?.Invoke("Экспорт", "У выбранных кривых отсутсвуют базовые имена.\n Укажите базовые имена...", MessageType.Warning);
             return;
         }
 
         try
         {
             IsLoading = true;
-            StatusMessage = "Экспорт...";
+            StatusMessage = "Экпорт выбранных кривых...";
+
+            // Build lists for display message
+            var exportedMappingsList = new List<string>();
+            var exportedIgnoredList = new List<string>();
 
             await Task.Run(() =>
             {
@@ -735,12 +789,19 @@ public partial class MainWindowViewModel : ObservableObject
                     {
                         aliases[primaryName].Add(fieldName);
                     }
+
+                    exportedMappingsList.Add($"{fieldName} → {primaryName}");
                 }
 
                 // Collect ignored curve names
                 var ignored = new HashSet<string>(
                     ignoredCurves.Select(c => c.CurveFieldName),
                     StringComparer.OrdinalIgnoreCase);
+
+                foreach (var curve in ignoredCurves)
+                {
+                    exportedIgnoredList.Add(curve.CurveFieldName);
+                }
 
                 // If file exists, append and sort; otherwise create new
                 if (File.Exists(filePath))
@@ -753,12 +814,52 @@ public partial class MainWindowViewModel : ObservableObject
                 }
             });
 
+            // Mark all selected curves as exported
+            foreach (var curve in selectedCurves)
+            {
+                curve.IsExported = true;
+            }
+            foreach (var curve in ignoredCurves)
+            {
+                curve.IsExported = true;
+            }
+
+            // Update exported count
+            OnPropertyChanged(nameof(ExportedCount));
+
+            // Build detailed message
             var totalCount = selectedCurves.Count + ignoredCurves.Count;
+            var messageLines = new List<string>
+            {
+                $"Экспортировано {totalCount} кривых в:",
+                filePath,
+                ""
+            };
+
+            if (exportedMappingsList.Count > 0)
+            {
+                messageLines.Add("Сопоставленные кривые:");
+                messageLines.AddRange(exportedMappingsList); // Limit to 20 items
+                //if (exportedMappingsList.Count > 20)
+                //    messageLines.Add($"... и еще {exportedMappingsList.Count - 20}");
+            }
+
+            if (exportedIgnoredList.Count > 0)
+            {
+                messageLines.Add("");
+                messageLines.Add("Сопоставлены как игнорируемые:");
+                messageLines.AddRange(exportedIgnoredList); // Limit to 10 items
+                //if (exportedIgnoredList.Count > 10)
+                //    messageLines.Add($"... и еще {exportedIgnoredList.Count - 10}");
+            }
+
             StatusMessage = $"Экспортировано {totalCount} кривых в {Path.GetFileName(filePath)}";
+            ShowMessageDialog?.Invoke("Успешный экспорт", string.Join("\n", messageLines), MessageType.Success);
         }
         catch (Exception ex)
         {
             StatusMessage = $"Error exporting: {ex.Message}";
+            ShowMessageDialog?.Invoke("Export Error", $"Failed to export:\n{ex.Message}", MessageType.Error);
         }
         finally
         {

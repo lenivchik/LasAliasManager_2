@@ -126,6 +126,12 @@ public partial class CurveRowViewModel : ObservableObject
     private bool _isSelectedForExport;
 
     /// <summary>
+    /// Whether this curve has been exported to TXT file
+    /// </summary>
+    [ObservableProperty]
+    private bool _isExported;
+
+    /// <summary>
     /// Status text for display
     /// </summary>
     public string StatusText
@@ -135,6 +141,8 @@ public partial class CurveRowViewModel : ObservableObject
             if (IsModified) return "Modified";
             if (IsUnknown) return "Unknown";
             if (IsIgnored) return "Ignored";
+            if (IsExported) return "Exported";
+
             return "Mapped";
         }
     }
@@ -172,6 +180,11 @@ public partial class CurveRowViewModel : ObservableObject
     }
 
     partial void OnIsUnknownChanged(bool value)
+    {
+        OnPropertyChanged(nameof(StatusText));
+    }
+
+    partial void OnIsExportedChanged(bool value)
     {
         OnPropertyChanged(nameof(StatusText));
     }
