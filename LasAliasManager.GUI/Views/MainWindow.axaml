@@ -184,6 +184,7 @@
                                     <DataTemplate x:DataType="vm:CurveRowViewModel">
                                         <ComboBox ItemsSource="{Binding AvailablePrimaryNames}"
                                                   SelectedItem="{Binding PrimaryName,  Mode=TwoWay}"
+                                                  IsEditable="True"
                                                   HorizontalAlignment="Stretch"/>
                                     </DataTemplate>
                                 </DataGridTemplateColumn.CellTemplate>

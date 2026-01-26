@@ -510,24 +510,59 @@ public partial class MainWindowViewModel : ObservableObject
             // Build a dictionary of new mappings for quick lookup
             var newMappings = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             var newIgnored = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
+            // Get current base names for checking if entered name is new
+            var existingBaseNames = new HashSet<string>(_aliasManager.Database.GetAllBaseNames(), StringComparer.OrdinalIgnoreCase);
             foreach (var curve in modifiedCurves)
             {
                 if (curve.PrimaryName == "[ИГНОРИРОВАТЬ]")
                 {
                     _aliasManager.AddAsIgnored(curve.CurveFieldName);
                     newIgnored.Add(curve.CurveFieldName);
+
+                    // Track for export
+                    _userDefinedIgnored.Add(curve.CurveFieldName);
+                    _userDefinedMappings.Remove(curve.CurveFieldName);
                 }
                 else if (curve.PrimaryName == "[НОВОЕ ИМЯ]")
                 {
                     _aliasManager.AddAsNewBase(curve.CurveFieldName);
                     newBaseNames.Add(curve.CurveFieldName);
                     newMappings[curve.CurveFieldName] = curve.CurveFieldName;
+                    existingBaseNames.Add(curve.CurveFieldName);
+
+                    // Track for export
+                    _userDefinedMappings[curve.CurveFieldName] = curve.CurveFieldName;
+                    _userDefinedIgnored.Remove(curve.CurveFieldName);
                 }
                 else if (!string.IsNullOrEmpty(curve.PrimaryName))
                 {
-                    _aliasManager.AddAsAlias(curve.CurveFieldName, curve.PrimaryName);
-                    newMappings[curve.CurveFieldName] = curve.PrimaryName;
+                    var enteredName = curve.PrimaryName.Trim();
+
+                    // Check if the entered name is a new base name (not in existing list)
+                    if (!existingBaseNames.Contains(enteredName) &&
+                        enteredName != "[ИГНОРИРОВАТЬ]" &&
+                        enteredName != "[НОВОЕ ИМЯ]")
+                    {
+                        // Create new base name with the user-entered name
+                        _aliasManager.Database.AddBaseName(enteredName, new[] { curve.CurveFieldName });
+                        newBaseNames.Add(enteredName);
+                        newMappings[curve.CurveFieldName] = enteredName;
+                        existingBaseNames.Add(enteredName);
+
+                        // Track for export
+                        _userDefinedMappings[curve.CurveFieldName] = enteredName;
+                        _userDefinedIgnored.Remove(curve.CurveFieldName);
+                    }
+                    else
+                    {
+                        // Add as alias to existing base name
+                        _aliasManager.AddAsAlias(curve.CurveFieldName, enteredName);
+                        newMappings[curve.CurveFieldName] = enteredName;
+
+                        // Track for export
+                        _userDefinedMappings[curve.CurveFieldName] = enteredName;
+                        _userDefinedIgnored.Remove(curve.CurveFieldName);
+                    }
                 }
             }
 
