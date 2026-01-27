@@ -7,6 +7,8 @@ using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using LasAliasManager.Core.Services;
+using static LasAliasManager.Core.Constants;
+
 
 namespace LasAliasManager.GUI.ViewModels;
 
@@ -130,10 +132,9 @@ public partial class MainWindowViewModel : ObservableObject
     public MainWindowViewModel()
     {
         _aliasManager = new AliasManager();
-        
-        AvailablePrimaryNames.Add("");
-        AvailablePrimaryNames.Add("[ИГНОРИРОВАТЬ]");
-        AvailablePrimaryNames.Add("[НОВОЕ ИМЯ]");
+        AvailablePrimaryNames.Add(Markers.Empty);
+        AvailablePrimaryNames.Add(Markers.Ignore);
+        AvailablePrimaryNames.Add(Markers.NewBase);
     }
 
     partial void OnSelectedFileChanged(LasFileViewModel? value)
@@ -211,8 +212,8 @@ public partial class MainWindowViewModel : ObservableObject
 
                     if (_aliasManager.Database.IsIgnored(fieldName))
                     {
-                        curve.OriginalPrimaryName = "[ИГНОРИРОВАТЬ]";
-                        curve.PrimaryName = "[ИГНОРИРОВАТЬ]";
+                        curve.OriginalPrimaryName = Markers.Ignore;
+                        curve.PrimaryName = Markers.Ignore;
                         curve.IsUnknown = false;
                         curve.IsIgnored = true;
                     }
@@ -261,8 +262,8 @@ public partial class MainWindowViewModel : ObservableObject
     {
         AvailablePrimaryNames.Clear();
         AvailablePrimaryNames.Add("");
-        AvailablePrimaryNames.Add("[ИГНОРИРОВАТЬ]");
-        AvailablePrimaryNames.Add("[НОВОЕ ИМЯ]");
+        AvailablePrimaryNames.Add(Markers.Ignore);
+        AvailablePrimaryNames.Add(Markers.NewBase);
 
         foreach (var baseName in _aliasManager.Database.GetAllBaseNames())
         {
@@ -335,8 +336,8 @@ public partial class MainWindowViewModel : ObservableObject
                         row.CurveDescription = curveDef.Description;
                         row.CurveUnits = curveDef.Units;
                     }
-                    row.OriginalPrimaryName = "[ИГНОРИРОВАТЬ]";
-                    row.PrimaryName = "[ИГНОРИРОВАТЬ]";
+                    row.OriginalPrimaryName = Markers.Ignore;
+                    row.PrimaryName = Markers.Ignore;
                     row.IsUnknown = false;
                     row.IsIgnored = true;
                     fileVm.Curves.Add(row);
@@ -512,7 +513,7 @@ public partial class MainWindowViewModel : ObservableObject
             var existingBaseNames = new HashSet<string>(_aliasManager.Database.GetAllBaseNames(), StringComparer.OrdinalIgnoreCase);
             foreach (var curve in modifiedCurves)
             {
-                if (curve.PrimaryName == "[ИГНОРИРОВАТЬ]")
+                if (curve.PrimaryName == Markers.Ignore)
                 {
                     _aliasManager.AddAsIgnored(curve.CurveFieldName);
                     newIgnored.Add(curve.CurveFieldName);
@@ -521,7 +522,7 @@ public partial class MainWindowViewModel : ObservableObject
                     _userDefinedIgnored.Add(curve.CurveFieldName);
                     _userDefinedMappings.Remove(curve.CurveFieldName);
                 }
-                else if (curve.PrimaryName == "[НОВОЕ ИМЯ]")
+                else if (curve.PrimaryName == Markers.NewBase)
                 {
                     _aliasManager.AddAsNewBase(curve.CurveFieldName);
                     newBaseNames.Add(curve.CurveFieldName);
@@ -538,8 +539,8 @@ public partial class MainWindowViewModel : ObservableObject
 
                     // Check if the entered name is a new base name (not in existing list)
                     if (!existingBaseNames.Contains(enteredName) &&
-                        enteredName != "[ИГНОРИРОВАТЬ]" &&
-                        enteredName != "[НОВОЕ ИМЯ]")
+                        enteredName != Markers.Ignore &&
+                        enteredName != Markers.NewBase)
                     {
                         // Create new base name with the user-entered name
                         _aliasManager.Database.AddBaseName(enteredName, new[] { curve.CurveFieldName });
@@ -596,8 +597,8 @@ public partial class MainWindowViewModel : ObservableObject
                     }
                     else if (newIgnored.Contains(fieldName))
                     {
-                        curve.OriginalPrimaryName = "[ИГНОРИРОВАТЬ]";
-                        curve.PrimaryName = "[ИГНОРИРОВАТЬ]";
+                        curve.OriginalPrimaryName = Markers.Ignore;
+                        curve.PrimaryName = Markers.Ignore;
                         curve.IsModified = false;
                         curve.IsUnknown = false;
                         curve.IsIgnored = true;
@@ -608,7 +609,7 @@ public partial class MainWindowViewModel : ObservableObject
                         curve.OriginalPrimaryName = curve.PrimaryName;
                         curve.IsModified = false;
                         curve.IsUnknown = string.IsNullOrEmpty(curve.PrimaryName);
-                        curve.IsIgnored = curve.PrimaryName == "[ИГНОРИРОВАТЬ]";
+                        curve.IsIgnored = curve.PrimaryName == Markers.Ignore;
                     }
                 }
 
@@ -777,12 +778,12 @@ public partial class MainWindowViewModel : ObservableObject
 
         var selectedCurves = LasFiles
             .SelectMany(f => f.Curves)
-            .Where(c => c.IsSelectedForExport && !string.IsNullOrEmpty(c.PrimaryName) && c.PrimaryName != "[ИГНОРИРОВАТЬ]")
+            .Where(c => c.IsSelectedForExport && !string.IsNullOrEmpty(c.PrimaryName) && c.PrimaryName != Markers.Ignore)
             .ToList();
 
         var ignoredCurves = LasFiles
             .SelectMany(f => f.Curves)
-            .Where(c => c.IsSelectedForExport && c.PrimaryName == "[ИГНОРИРОВАТЬ]")
+            .Where(c => c.IsSelectedForExport && c.PrimaryName == Markers.Ignore)
             .ToList();
 
         if (selectedCurves.Count == 0 && ignoredCurves.Count == 0)

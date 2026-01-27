@@ -1,6 +1,8 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
 using System;
 using System.Collections.ObjectModel;
+using static LasAliasManager.Core.Constants;
+
 
 namespace LasAliasManager.GUI.ViewModels;
 
@@ -138,12 +140,12 @@ public partial class CurveRowViewModel : ObservableObject
     {
         get
         {
-            if (IsModified) return "Изменен";
-            if (IsUnknown) return "Неизвестный";
-            if (IsIgnored) return "Игнорируется";
-            if (IsExported) return "Exported";
+            if (IsModified) return UiStrings.StatusModified;
+            if (IsUnknown) return UiStrings.StatusUnknown;
+            if (IsIgnored) return UiStrings.StatusIgnored;
+            if (IsExported) return UiStrings.StatusExported;
 
-            return "Сопоставлен";
+            return UiStrings.StatusMapped;
         }
     }
     public Avalonia.Media.IBrush StatusColor

@@ -1,18 +1,13 @@
 ﻿using System.Text;
+using static LasAliasManager.Core.Constants;
 
 namespace LasAliasManager.Core.Services;
 
 /// <summary>
-/// Exports alias database to ListNamesAlias.txt format (system file)
+/// Экспорт в ListNamesAlias.txt
 /// </summary>
 public class ListNamesAliasExporter
 {
-    private const string Header = @"Основное     Полевые
-  имя         имена
-===================================================================================================";
-
-    private const string Footer = "**********************************************************************************************************";
-
     /// <summary>
     /// Exports the database to ListNamesAlias.txt format
     /// Sorted by PrimaryName, then by FieldName within each primary name
@@ -24,7 +19,6 @@ public class ListNamesAliasExporter
     {
         var entries = new List<(string PrimaryName, string FieldName)>();
 
-        // Add all aliases
         foreach (var kvp in aliases)
         {
             var primaryName = kvp.Key;
@@ -33,38 +27,33 @@ public class ListNamesAliasExporter
                 entries.Add((primaryName, fieldName));
             }
 
-            // Also add the base name itself as an entry
             if (!kvp.Value.Contains(primaryName, StringComparer.OrdinalIgnoreCase))
             {
                 entries.Add((primaryName, primaryName));
             }
         }
 
-        // Add ignored names with "No" as primary name
         foreach (var ignored in ignoredNames)
         {
-            entries.Add(("No", ignored));
+            entries.Add((PrimaryNames.Ignored, ignored));
         }
 
-        // Sort by PrimaryName, then by FieldName
         var sorted = entries
             .OrderBy(e => e.PrimaryName, StringComparer.OrdinalIgnoreCase)
             .ThenBy(e => e.FieldName, StringComparer.OrdinalIgnoreCase)
             .ToList();
 
-        // Write file
-        using var writer = new StreamWriter(filePath, false, Encoding.GetEncoding(1251)); // Windows-1251 for Cyrillic
+        using var writer = new StreamWriter(filePath, false, Encoding.GetEncoding(1251));
 
-        writer.WriteLine(Header);
+        writer.WriteLine(TxtExport.Header); 
 
         foreach (var entry in sorted)
         {
-            // Format: PrimaryName (left-padded to ~10 chars) followed by FieldName
-            var line = $"{entry.PrimaryName,-10} {entry.FieldName}";
+            var line = $"{entry.PrimaryName,-TxtExport.PrimaryNameColumnWidth} {entry.FieldName}";
             writer.WriteLine(line);
         }
 
-        writer.WriteLine(Footer);
+        writer.WriteLine(TxtExport.Footer);
     }
 
     /// <summary>
@@ -96,7 +85,7 @@ public class ListNamesAliasExporter
         // Add new ignored names
         foreach (var ignored in newIgnored)
         {
-            var entry = ("No", ignored);
+            var entry = (PrimaryNames.Ignored, ignored);
             if (!existingEntries.Contains(entry))
             {
                 existingEntries.Add(entry);
@@ -111,7 +100,7 @@ public class ListNamesAliasExporter
 
         using var writer = new StreamWriter(filePath, false, Encoding.GetEncoding(1251));
 
-        writer.WriteLine(Header);
+        writer.WriteLine(TxtExport.Header);
 
         foreach (var entry in sorted)
         {
@@ -119,7 +108,7 @@ public class ListNamesAliasExporter
             writer.WriteLine(line);
         }
 
-        writer.WriteLine(Footer);
+        writer.WriteLine(TxtExport.Footer);
     }
 
     /// <summary>

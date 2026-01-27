@@ -1,14 +1,16 @@
-using System.Text;
+﻿using System.Text;
+using System.Threading.Channels;
+using static LasAliasManager.Core.Constants;
 
 namespace LasAliasManager.Core.Services;
 
 /// <summary>
-/// Parses and saves alias database in CSV format
+/// Парсинг и сохранение CSV файла (БД)
 /// </summary>
 public class CsvAliasParser
 {
     /// <summary>
-    /// Represents a single record from the CSV file
+    /// Элемент БД 
     /// </summary>
     public class AliasRecord
     {
@@ -19,9 +21,9 @@ public class CsvAliasParser
     }
 
     /// <summary>
-    /// Loads alias database from CSV file
+    /// Загрузка из CSV файла
     /// </summary>
-    /// <returns>Tuple of (baseNames dictionary, ignoredNames set)</returns>
+    /// <returns>Возвращает списки с базовыми/полувыми именами и игнорируемыми (baseNames dictionary, ignoredNames set)</returns>
     public (Dictionary<string, List<string>> Aliases, HashSet<string> Ignored) LoadCsvFile(string filePath)
     {
         var aliases = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
@@ -33,16 +35,15 @@ public class CsvAliasParser
         {
             switch (record.Status.ToLowerInvariant())
             {
-                case "base":
-                    // Add base name with itself as first alias
+                //базовые имена
+                case Status.Base:
                     if (!aliases.ContainsKey(record.FieldName))
                     {
                         aliases[record.FieldName] = new List<string>();
                     }
                     break;
-
-                case "alias":
-                    // Add field name as alias to primary name
+                //полевые
+                case Status.Alias:
                     if (!string.IsNullOrWhiteSpace(record.PrimaryName))
                     {
                         if (!aliases.ContainsKey(record.PrimaryName))
@@ -55,8 +56,8 @@ public class CsvAliasParser
                         }
                     }
                     break;
-
-                case "ignore":
+                //игнорируемые
+                case Status.Ignore:
                     ignored.Add(record.FieldName);
                     break;
             }
@@ -66,48 +67,47 @@ public class CsvAliasParser
     }
 
     /// <summary>
-    /// Saves alias database to CSV file
+    /// Сохранение в CSV файл
     /// </summary>
     public void SaveCsvFile(string filePath, Dictionary<string, List<string>> aliases, HashSet<string> ignored)
     {
         var records = new List<AliasRecord>();
 
-        // Add base names
+        // Базовые имена
         foreach (var baseName in aliases.Keys.OrderBy(k => k))
         {
             records.Add(new AliasRecord
             {
                 FieldName = baseName,
                 PrimaryName = baseName,
-                Status = "base",
+                Status = Status.Base,
                 Description = ""
             });
 
-            // Add aliases for this base name
+            // Полевые
             foreach (var alias in aliases[baseName].OrderBy(a => a))
             {
-                // Skip if alias equals base name
                 if (!alias.Equals(baseName, StringComparison.OrdinalIgnoreCase))
                 {
                     records.Add(new AliasRecord
                     {
                         FieldName = alias,
                         PrimaryName = baseName,
-                        Status = "alias",
+                        Status = Status.Alias,
                         Description = ""
                     });
                 }
             }
         }
 
-        // Add ignored names
+        // Игнорируемые
         foreach (var name in ignored.OrderBy(n => n))
         {
             records.Add(new AliasRecord
             {
                 FieldName = name,
                 PrimaryName = "",
-                Status = "ignore",
+                Status = Status.Ignore,
                 Description = ""
             });
         }
@@ -116,7 +116,7 @@ public class CsvAliasParser
     }
 
     /// <summary>
-    /// Gets all records from CSV file (for advanced operations)
+    /// Чтение записей CSV
     /// </summary>
     public List<AliasRecord> ReadCsvRecords(string filePath)
     {
@@ -138,7 +138,8 @@ public class CsvAliasParser
                 continue;
 
             var fields = ParseCsvLine(line);
-            if (fields.Length >= 3)
+            // Смотрим количество записей 
+            if (fields.Length >= CsvHeaders.MinimumColumns)
             {
                 records.Add(new AliasRecord
                 {
@@ -152,13 +153,15 @@ public class CsvAliasParser
 
         return records;
     }
-
+    /// <summary>
+    /// Сохранение в CSV
+    /// </summary>
     private void WriteCsvFile(string filePath, List<AliasRecord> records)
     {
         using var writer = new StreamWriter(filePath, false, new UTF8Encoding(true));
 
-        // Write header
-        writer.WriteLine("FieldName,PrimaryName,Status,Description");
+        // Заголовок
+        writer.WriteLine(CsvHeaders.Header);
 
         foreach (var record in records)
         {

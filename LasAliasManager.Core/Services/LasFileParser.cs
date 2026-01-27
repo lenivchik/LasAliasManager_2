@@ -1,15 +1,16 @@
 ﻿using System.Text;
 using System.Text.RegularExpressions;
+using static LasAliasManager.Core.Constants;
 
 namespace LasAliasManager.Core.Services;
 
 /// <summary>
-/// Parses LAS (Log ASCII Standard) files to extract curve information
+/// Парсинг LAS файла для извлечения информации о нем
 /// </summary>
 public class LasFileParser
 {
     /// <summary>
-    /// Represents a curve definition from a LAS file
+    /// Описание кривой
     /// </summary>
     public class CurveDefinition
     {
@@ -25,7 +26,7 @@ public class LasFileParser
     }
 
     /// <summary>
-    /// Represents well information from a LAS file
+    /// well information
     /// </summary>
     public class WellInfo
     {
@@ -36,7 +37,7 @@ public class LasFileParser
     }
 
     /// <summary>
-    /// Represents the parsed content of a LAS file
+    ///parsed content of LAS file
     /// </summary>
     public class LasFileContent
     {
@@ -49,7 +50,7 @@ public class LasFileParser
     }
 
     /// <summary>
-    /// Parses a LAS file and extracts curve section information
+    /// Parses a LAS file and extracts curve information
     /// </summary>
     public LasFileContent ParseLasFile(string filePath)
     {
@@ -67,34 +68,32 @@ public class LasFileParser
         {
             var trimmed = line.Trim();
 
-            // Skip empty lines and comments
             if (string.IsNullOrWhiteSpace(trimmed) || trimmed.StartsWith("#"))
                 continue;
 
-            // Check for section headers
+            // Начало секции
             if (trimmed.StartsWith("~"))
             {
                 currentSection = GetSectionType(trimmed);
                 continue;
             }
 
-            // Process lines based on current section
+            // Проходим по секциям, смотрим только на WELL и CURVE
             switch (currentSection)
-            {
-                case "VERSION":
+            { 
+                case LasSections.Version:
                     break;
-                case "WELL":
+                case LasSections.Well:
                     ParseWellInfoLine(trimmed, wellInfoDict);
                     break;
-                case "CURVE":
+                case LasSections.Curve:
                     var curve = ParseCurveLine(trimmed);
                     if (curve != null)
                     {
                         result.Curves.Add(curve);
                     }
                     break;
-                case "ASCII":
-                    // Stop parsing when we reach the data section
+                case LasSections.Ascii:  
                     ProcessWellInfo(wellInfoDict, result.WellInfo);
                     return result;
             }
@@ -102,48 +101,6 @@ public class LasFileParser
 
         ProcessWellInfo(wellInfoDict, result.WellInfo);
         return result;
-    }
-
-    /// <summary>
-    /// Extracts only curve names from a LAS file (faster than full parse)
-    /// </summary>
-    public List<string> ExtractCurveNames(string filePath)
-    {
-        var curveNames = new List<string>();
-        var lines = ReadFileLines(filePath);
-
-        bool inCurveSection = false;
-
-        foreach (var line in lines)
-        {
-            var trimmed = line.Trim();
-
-            if (string.IsNullOrWhiteSpace(trimmed) || trimmed.StartsWith("#"))
-                continue;
-
-            if (trimmed.StartsWith("~"))
-            {
-                var sectionType = GetSectionType(trimmed);
-                inCurveSection = sectionType == "CURVE";
-                
-                // Stop if we've passed the curve section
-                if (!inCurveSection && curveNames.Count > 0)
-                    break;
-                    
-                continue;
-            }
-
-            if (inCurveSection)
-            {
-                var curve = ParseCurveLine(trimmed);
-                if (curve != null)
-                {
-                    curveNames.Add(curve.Mnemonic);
-                }
-            }
-        }
-
-        return curveNames;
     }
 
     /// <summary>
@@ -159,36 +116,26 @@ public class LasFileParser
 
     private void ProcessWellInfo(Dictionary<string, (string Value, string Unit)> wellInfoDict, WellInfo wellInfo)
     {
-        if (wellInfoDict.TryGetValue("STRT", out var strt))
+        if (wellInfoDict.TryGetValue(WellFields.Start, out var strt))
         {
             wellInfo.Strt = ParseDouble(strt.Value);
         }
-        if (wellInfoDict.TryGetValue("STOP", out var stop))
+        if (wellInfoDict.TryGetValue(WellFields.Stop, out var stop))
         {
             wellInfo.Stop = ParseDouble(stop.Value);
         }
-        if (wellInfoDict.TryGetValue("STEP", out var step))
+        if (wellInfoDict.TryGetValue(WellFields.Step, out var step))
         {
             wellInfo.Step = ParseDouble(step.Value);
-        }
-
-        foreach (var kvp in wellInfoDict)
-        {
-            if (!new[] { "STRT", "STOP", "STEP", "WELL" }.Contains(kvp.Key, StringComparer.OrdinalIgnoreCase))
-            {
-                wellInfo.OtherInfo[kvp.Key] = kvp.Value.Value;
-            }
         }
     }
 
     private double? ParseDouble(string value)
-    {
+    {        
         if (string.IsNullOrWhiteSpace(value))
             return null;
         
-        // Handle null values commonly used in LAS files
-        var nullValues = new[] { "-999.25", "-999.2500", "-9999.25", "null", "-999", "-9999" };
-        if (nullValues.Contains(value, StringComparer.OrdinalIgnoreCase))
+        if (LasNullValues.Contains(value, StringComparer.OrdinalIgnoreCase))
             return null;
 
         if (double.TryParse(value.Replace(',', '.'), 
@@ -240,33 +187,21 @@ public class LasFileParser
     private string GetSectionType(string sectionHeader)
     {
         var header = sectionHeader.ToUpperInvariant();
-        
-        if (header.Contains("VERSION") || header.StartsWith("~V"))
-            return "VERSION";
-        if (header.Contains("WELL") || header.StartsWith("~W"))
-            return "WELL";
-        if (header.Contains("CURVE") || header.StartsWith("~C"))
-            return "CURVE";
-        if (header.Contains("PARAMETER") || header.StartsWith("~P"))
-            return "PARAMETER";
-        if (header.Contains("OTHER") || header.StartsWith("~O"))
-            return "OTHER";
-        if (header.Contains("ASCII") || header.StartsWith("~A"))
-            return "ASCII";
 
-        return "UNKNOWN";
-    }
+        if (header.Contains(LasSections.Version) || header.StartsWith("~V"))
+            return LasSections.Version;
+        if (header.Contains(LasSections.Well) || header.StartsWith("~W"))
+            return LasSections.Well;
+        if (header.Contains(LasSections.Curve) || header.StartsWith("~C"))
+            return LasSections.Curve;
+        if (header.Contains(LasSections.Parameter) || header.StartsWith("~P"))
+            return LasSections.Parameter;
+        if (header.Contains(LasSections.Other) || header.StartsWith("~O"))
+            return LasSections.Other;
+        if (header.Contains(LasSections.Ascii) || header.StartsWith("~A"))
+            return LasSections.Ascii;
 
-    private void ParseInfoLine(string line, Dictionary<string, string> dict)
-    {
-        // LAS format: MNEMONIC.UNIT VALUE:DESCRIPTION
-        var match = Regex.Match(line, @"^(\w+)\s*\.([^:]*):(.*)$");
-        if (match.Success)
-        {
-            var mnemonic = match.Groups[1].Value.Trim();
-            var value = match.Groups[2].Value.Trim();
-            dict[mnemonic] = value;
-        }
+        return LasSections.Unknown;
     }
 
     private void ParseWellInfoLine(string line, Dictionary<string, (string Value, string Unit)> dict)
