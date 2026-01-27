@@ -12,7 +12,7 @@
         WindowStartupLocation="CenterScreen">
 
     
-    <Grid RowDefinitions="Auto,Auto,Auto,*,Auto,Auto">
+    <Grid RowDefinitions="Auto,Auto,30,*,30,Auto">
         <!-- Row 0: Menu Bar -->
         <Menu Grid.Row="0">
             <MenuItem Header="Файл">
@@ -149,7 +149,9 @@
                               GridLinesVisibility="All"
                               IsReadOnly="False"
                               SelectionMode="Extended"
-                              Background="White">
+                              Background="White"
+                              FocusAdorner="{x:Null}">
+
                             <DataGrid.Styles>
                                 <Style Selector="DataGridColumnHeader">
                                     <Setter Property="FontSize" Value="16"/>
@@ -183,13 +185,25 @@
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate x:DataType="vm:CurveRowViewModel">
                                         <ComboBox ItemsSource="{Binding AvailablePrimaryNames}"
-                                                  SelectedItem="{Binding PrimaryName,  Mode=TwoWay}"
+                                                  Text="{Binding PrimaryName, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
                                                   IsEditable="True"
-                                                  HorizontalAlignment="Stretch"/>
+                                                  HorizontalAlignment="Stretch"
+                                                  Focusable="True"/>
                                     </DataTemplate>
                                 </DataGridTemplateColumn.CellTemplate>
                             </DataGridTemplateColumn>
-
+                            <!-- Status with color coding -->
+                            <DataGridTemplateColumn Header="Статус">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate x:DataType="vm:CurveRowViewModel">
+                                        <TextBlock Text="{Binding StatusText}"
+                                                   Foreground="{Binding StatusColor}"
+                                                   VerticalAlignment="Center"
+                                                   HorizontalAlignment="Center"
+                                                   FontWeight="SemiBold"/>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
                         </DataGrid.Columns>
                     </DataGrid>
                 </Grid>

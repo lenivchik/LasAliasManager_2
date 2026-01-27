@@ -402,17 +402,15 @@ public partial class MainWindowViewModel : ObservableObject
         // Wire up modification callback
         row.OnModificationChanged = () =>
         {
-            parentFile.RefreshStatus();
-            UpdateHasUnsavedChanges();
-
-            // Update total unknown count
-            UnknownCurves = LasFiles.Sum(f => f.UnknownCount);
-
-            // Update file filter if "Show Only Unknown" is active
-            if (ShowOnlyUnknown)
+            // Defer status updates to avoid interfering with current UI operation
+            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
             {
-                ApplyFileFilter();
-            }
+                parentFile.RefreshStatus();
+                UpdateHasUnsavedChanges();
+
+                // Update total unknown count
+                UnknownCurves = LasFiles.Sum(f => f.UnknownCount);
+            }, Avalonia.Threading.DispatcherPriority.Background);
         };
 
         // Wire up selection for export callback

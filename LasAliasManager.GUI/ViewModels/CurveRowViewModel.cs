@@ -138,15 +138,25 @@ public partial class CurveRowViewModel : ObservableObject
     {
         get
         {
-            if (IsModified) return "Modified";
-            if (IsUnknown) return "Unknown";
-            if (IsIgnored) return "Ignored";
+            if (IsModified) return "Изменен";
+            if (IsUnknown) return "Неизвестный";
+            if (IsIgnored) return "Игнорируется";
             if (IsExported) return "Exported";
 
-            return "Mapped";
+            return "Сопоставлен";
         }
     }
-
+    public Avalonia.Media.IBrush StatusColor
+    {
+        get
+        {
+            if (IsModified) return Avalonia.Media.Brushes.Blue;
+            if (IsUnknown) return Avalonia.Media.Brushes.Orange;
+            if (IsIgnored) return Avalonia.Media.Brushes.Gray;
+            if (IsExported) return Avalonia.Media.Brushes.Purple;
+            return Avalonia.Media.Brushes.Green;
+        }
+    }
     /// <summary>
     /// Original primary name before any changes
     /// </summary>
@@ -166,6 +176,7 @@ public partial class CurveRowViewModel : ObservableObject
     {
         IsModified = value != OriginalPrimaryName;
         OnPropertyChanged(nameof(StatusText));
+        OnPropertyChanged(nameof(StatusColor));
         OnModificationChanged?.Invoke();
     }
 
@@ -177,21 +188,25 @@ public partial class CurveRowViewModel : ObservableObject
     partial void OnIsModifiedChanged(bool value)
     {
         OnPropertyChanged(nameof(StatusText));
+        OnPropertyChanged(nameof(StatusColor));
     }
 
     partial void OnIsUnknownChanged(bool value)
     {
         OnPropertyChanged(nameof(StatusText));
-    }
-
-    partial void OnIsExportedChanged(bool value)
-    {
-        OnPropertyChanged(nameof(StatusText));
+        OnPropertyChanged(nameof(StatusColor));
     }
 
     partial void OnIsIgnoredChanged(bool value)
     {
         OnPropertyChanged(nameof(StatusText));
+        OnPropertyChanged(nameof(StatusColor));
+    }
+
+    partial void OnIsExportedChanged(bool value)
+    {
+        OnPropertyChanged(nameof(StatusText));
+        OnPropertyChanged(nameof(StatusColor));
     }
 
     partial void OnTopChanged(double? value)
