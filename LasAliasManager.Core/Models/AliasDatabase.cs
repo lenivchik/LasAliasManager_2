@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-
+namespace LasAliasManager.Core.Models;
 /// <summary>
 /// Внутреннее представление БД, 2 списка:
 /// 1. список полевое имя -> базовое имя
@@ -97,8 +97,6 @@ public class AliasDatabase
     public bool AddAliasToBase(string baseName, string fieldName)
     {
         var trimmedBase = baseName.Trim();
-        var trimmedField = fieldName.Trim();
-
         if (!_baseNames.Contains(trimmedBase))
         {
             return false;

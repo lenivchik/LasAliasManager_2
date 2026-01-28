@@ -104,7 +104,7 @@ public class ListNamesAliasExporter
 
         foreach (var entry in sorted)
         {
-            var line = $"{entry.PrimaryName,-10} {entry.FieldName}";
+            var line = $"{entry.PrimaryName,-TxtExport.PrimaryNameColumnWidth} {entry.FieldName}";
             writer.WriteLine(line);
         }
 
