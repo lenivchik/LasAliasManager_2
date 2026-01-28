@@ -567,7 +567,7 @@ public partial class MainWindowViewModel : ObservableObject
 
             await Task.Run(() =>
             {
-                _aliasManager.SaveToFiles();
+                _aliasManager.SaveToCsv();
             });
 
             // Add new base names to available list

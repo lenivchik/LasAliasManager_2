@@ -1,4 +1,5 @@
 ﻿using LasAliasManager.Core.Models;
+using static AliasDatabase;
 
 namespace LasAliasManager.Core.Services;
 
@@ -31,16 +32,7 @@ public class AliasManager
         Database = new AliasDatabase();
         DatabaseFilePath = csvFilePath;
         var (aliases, ignored) = _csvParser.LoadCsvFile(csvFilePath);
-
-        foreach (var kvp in aliases)
-        {
-            Database.AddBaseName(kvp.Key, kvp.Value);
-        }
-
-        foreach (var name in ignored)
-        {
-            Database.AddIgnored(name);
-        }
+        Database.LoadFrom(aliases, ignored);
     }
 
     /// <summary>
@@ -55,34 +47,13 @@ public class AliasManager
             throw new InvalidOperationException("CSV file path not specified");
         }
 
-        var aliases = Database.Aliases.ToDictionary(
-            k => k.Key,
-            v => v.Value.FieldNames
-        );
+        var aliases = Database.GetAllAliasesGrouped();
+        var ignored = Database.GetIgnoredNamesSet();
 
-        _csvParser.SaveCsvFile(csvFilePath, aliases, Database.IgnoredNames);
+        _csvParser.SaveCsvFile(csvFilePath, aliases, ignored);
         DatabaseFilePath = csvFilePath;
     }
 
-    /// <summary>
-    /// Saves the current database (uses the format it was loaded with)
-    /// </summary>
-    public void SaveToFiles(string? filePath = null, string? ignoredFilePath = null)
-    {
-        if (string.IsNullOrEmpty(DatabaseFilePath))
-        {
-            throw new InvalidOperationException("No database loaded. Load a database first.");
-        }
-        SaveToCsv(DatabaseFilePath);
-    }
-
-    /// <summary>
-    /// Parses a single LAS file and returns full content with well info
-    /// </summary>
-    public LasFileParser.LasFileContent ParseLasFile(string filePath)
-    {
-        return _lasParser.ParseLasFile(filePath);
-    }
 
     /// <summary>
     /// Analyzes a single LAS file for unknown curve names
@@ -102,26 +73,26 @@ public class AliasManager
             foreach (var curve in content.Curves)
             {
                 var cleanName = CleanCurveName(curve.Mnemonic);
-                
-                if (Database.IsIgnored(cleanName))
+                var (classification, baseName) = Database.Classify(cleanName);  // Single lookup!
+
+                switch (classification)
                 {
-                    result.IgnoredCurves.Add(cleanName);
-                }
-                else
-                {
-                    var baseName = Database.FindBaseName(cleanName);
-                    if (baseName != null)
-                    {
-                        if (!result.MappedCurves.ContainsKey(baseName))
+                    case CurveClassification.Ignored:
+                        result.IgnoredCurves.Add(cleanName);
+                        break;
+
+                    case CurveClassification.Mapped:
+                        if (!result.MappedCurves.TryGetValue(baseName!, out var list))
                         {
-                            result.MappedCurves[baseName] = new List<string>();
+                            list = new List<string>();
+                            result.MappedCurves[baseName!] = list;
                         }
-                        result.MappedCurves[baseName].Add(cleanName);
-                    }
-                    else
-                    {
+                        list.Add(cleanName);
+                        break;
+
+                    case CurveClassification.Unknown:
                         result.UnknownCurves.Add(cleanName);
-                    }
+                        break;
                 }
             }
         }
@@ -150,77 +121,10 @@ public class AliasManager
     }
 
     /// <summary>
-    /// Gets all unique unknown curve names from multiple analysis results
-    /// </summary>
-    public HashSet<string> GetAllUnknownCurves(IEnumerable<LasAnalysisResult> results)
-    {
-        var unknown = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var result in results)
-        {
-            foreach (var curve in result.UnknownCurves)
-            {
-                unknown.Add(curve);
-            }
-        }
-        return unknown;
-    }
-
-    /// <summary>
-    /// Gets all unknown curves with their source file information
-    /// </summary>
-    public List<UnknownCurveInfo> GetAllUnknownCurvesWithFiles(IEnumerable<LasAnalysisResult> results)
-    {
-        var unknownList = new List<UnknownCurveInfo>();
-        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        
-        foreach (var result in results)
-        {
-            foreach (var curve in result.UnknownCurves)
-            {
-                if (!seen.Contains(curve))
-                {
-                    seen.Add(curve);
-                    unknownList.Add(new UnknownCurveInfo(curve, result.FilePath));
-                }
-            }
-        }
-        return unknownList;
-    }
-
-    /// <summary>
-    /// Gets unknown curves grouped by curve name with all source files
-    /// </summary>
-    public Dictionary<string, List<string>> GetUnknownCurvesGrouped(IEnumerable<LasAnalysisResult> results)
-    {
-        var grouped = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
-        
-        foreach (var result in results)
-        {
-            foreach (var curve in result.UnknownCurves)
-            {
-                if (!grouped.ContainsKey(curve))
-                {
-                    grouped[curve] = new List<string>();
-                }
-                if (!grouped[curve].Contains(result.FilePath))
-                {
-                    grouped[curve].Add(result.FilePath);
-                }
-            }
-        }
-        return grouped;
-    }
-
-    /// <summary>
     /// Adds an unknown curve as an alias to an existing base name
     /// </summary>
     public bool AddAsAlias(string curveName, string baseName)
     {
-        if (!Database.Aliases.ContainsKey(baseName))
-        {
-            return false;
-        }
-
         return Database.AddAliasToBase(baseName, curveName);
     }
 

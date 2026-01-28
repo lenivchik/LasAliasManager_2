@@ -121,7 +121,7 @@ public class CsvAliasParser
     public List<AliasRecord> ReadCsvRecords(string filePath)
     {
         var records = new List<AliasRecord>();
-        var lines = ReadFileLines(filePath);
+        var lines = FileEncoder.ReadFileLines(filePath);
 
         bool isFirstLine = true;
 
@@ -236,29 +236,4 @@ public class CsvAliasParser
         return value;
     }
 
-    private List<string> ReadFileLines(string filePath)
-    {
-        var bytes = File.ReadAllBytes(filePath);
-
-        // Try UTF-8 with BOM first
-        if (bytes.Length >= 3 && bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF)
-        {
-            var text = Encoding.UTF8.GetString(bytes, 3, bytes.Length - 3);
-            return text.Split('\n').Select(l => l.TrimEnd('\r')).ToList();
-        }
-
-        // Try UTF-8
-        try
-        {
-            var utf8 = new UTF8Encoding(false, true);
-            var text = utf8.GetString(bytes);
-            return text.Split('\n').Select(l => l.TrimEnd('\r')).ToList();
-        }
-        catch { }
-
-        // Fallback to Latin1
-        var latin1 = Encoding.Latin1;
-        var content = latin1.GetString(bytes);
-        return content.Split('\n').Select(l => l.TrimEnd('\r')).ToList();
-    }
 }

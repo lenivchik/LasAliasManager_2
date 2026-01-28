@@ -121,7 +121,7 @@ public class ListNamesAliasExporter
         if (!File.Exists(filePath))
             return entries;
 
-        var lines = ReadFileLinesAnsi(filePath);
+        var lines = FileEncoder.ReadFileLinesAnsi(filePath);
         bool headerPassed = false;
 
         foreach (var line in lines)
@@ -170,48 +170,5 @@ public class ListNamesAliasExporter
         return entries;
     }
 
-    private List<string> ReadFileLines(string filePath)
-    {
-        var bytes = File.ReadAllBytes(filePath);
-
-        // Try to detect encoding using Ude
-        try
-        {
-            using var fs = File.OpenRead(filePath);
-            var detector = new Ude.CharsetDetector();
-            detector.Feed(fs);
-            detector.DataEnd();
-
-            if (!string.IsNullOrEmpty(detector.Charset))
-            {
-                var encoding = Encoding.GetEncoding(detector.Charset);
-                var text = File.ReadAllText(filePath, encoding);
-                return text.Split('\n').Select(l => l.TrimEnd('\r')).ToList();
-            }
-        }
-        catch { }
-
-        // Fallback to UTF-8 with fallback to Latin1
-        try
-        {
-            var utf8 = new UTF8Encoding(false, true);
-            var text = utf8.GetString(bytes);
-            return text.Split('\n').Select(l => l.TrimEnd('\r')).ToList();
-        }
-        catch { }
-
-        // Final fallback
-        var latin1 = Encoding.Latin1;
-        var content = latin1.GetString(bytes);
-        return content.Split('\n').Select(l => l.TrimEnd('\r')).ToList();
-
-    }
-    private List<string> ReadFileLinesAnsi(string filePath)
-    {
-        var ansi = Encoding.GetEncoding(1251);
-
-        var text = File.ReadAllText(filePath, ansi);
-        return text.Split('\n').Select(l => l.TrimEnd('\r')).ToList();
-
-    }
+   
 }

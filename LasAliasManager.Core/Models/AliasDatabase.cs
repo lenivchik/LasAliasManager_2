@@ -1,135 +1,269 @@
-﻿namespace LasAliasManager.Core.Models;
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
 
 /// <summary>
-/// Database containing all curve aliases and ignored names
+/// Внутреннее представление БД, 2 списка:
+/// 1. список полевое имя -> базовое имя
+/// 2. список базовых имен
 /// </summary>
+
 public class AliasDatabase
 {
     /// <summary>
-    /// Dictionary mapping base names to their CurveAlias objects
+    ///Словарь:
+    /// - Ключ: полевое имя
+    /// - Значение: базовое значение или null, если игнорируется
     /// </summary>
-    public Dictionary<string, CurveAlias> Aliases { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, string?> _fieldMappings = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
-    /// Set of curve names that should be ignored during analysis
+    /// Отдельный список базовых имен (для выпадающего списка)
     /// </summary>
-    public HashSet<string> IgnoredNames { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<string> _baseNames = new(StringComparer.OrdinalIgnoreCase);
+
+
 
     /// <summary>
-    /// Finds the base name for a given field name
+    /// Находит базовое имя для заданного полевого имени
     /// </summary>
-    /// <param name="fieldName">The field name to look up</param>
-    /// <returns>The base name if found, null otherwise</returns>
+    /// <returns> Базовое имя, если найдено или null, если неизвестно/игнорируется</returns>
     public string? FindBaseName(string fieldName)
     {
         var trimmed = fieldName.Trim();
-
-        // Check if it's a base name itself
-
-        if (Aliases.TryGetValue(trimmed, out var alias))
-            return alias.BaseName;  // Returns "DTp" (the actual base name)
-        // Search through all aliases
-        foreach (var kvp in Aliases)
-        {
-            if (kvp.Value.IsAlias(trimmed))
-                return kvp.Key;
-        }
-
-        return null;
+        return _fieldMappings.TryGetValue(trimmed, out var baseName) ? baseName : null;
     }
 
     /// <summary>
-    /// Checks if a name should be ignored
+    /// Проверка: игнориуется? (есть в списке && значение null) .
     /// </summary>
     public bool IsIgnored(string name)
     {
-        return IgnoredNames.Contains(name.Trim());
+        var trimmed = name.Trim();
+        return _fieldMappings.TryGetValue(trimmed, out var baseName) && baseName == null;
     }
 
     /// <summary>
-    /// Checks if a name is known (either as alias or ignored)
+    /// Наличие имени в БД.
     /// </summary>
     public bool IsKnown(string name)
     {
-        var trimmed = name.Trim();
-        return IsIgnored(trimmed) || FindBaseName(trimmed) != null;
+        return _fieldMappings.ContainsKey(name.Trim());
     }
 
     /// <summary>
-    /// Adds a new alias to an existing base name
+    /// Проверка на базовое имя
     /// </summary>
-    public bool AddAliasToBase(string baseName, string fieldName)
+    public bool IsBaseName(string name)
     {
-        var trimmedFieldName = fieldName.Trim();
-
-        // Remove from ignored list if present (prevents duplicate records)
-        IgnoredNames.Remove(trimmedFieldName);
-
-        // Remove from any other base name's aliases (in case it was mapped elsewhere)
-        RemoveFieldNameFromAllAliases(trimmedFieldName);
-
-        if (!Aliases.TryGetValue(baseName, out var curveAlias))
-        {
-            curveAlias = new CurveAlias(baseName);
-            Aliases[baseName] = curveAlias;
-        }
-        return curveAlias.AddAlias(trimmedFieldName);
+        return _baseNames.Contains(name.Trim());
     }
 
+
+
     /// <summary>
-    /// Adds a new base name with optional aliases
+    /// Добавление базового имени и соответвующих полевых 
     /// </summary>
     public void AddBaseName(string baseName, IEnumerable<string>? aliases = null)
     {
-        if (!Aliases.ContainsKey(baseName))
-        {
-            Aliases[baseName] = new CurveAlias(baseName, aliases ?? Enumerable.Empty<string>());
-        }
-        else if (aliases != null)
+        var trimmedBase = baseName.Trim();
+
+        _baseNames.Add(trimmedBase);
+
+        _fieldMappings[trimmedBase] = trimmedBase;
+
+        if (aliases != null)
         {
             foreach (var alias in aliases)
             {
-                Aliases[baseName].AddAlias(alias);
+                var trimmedAlias = alias.Trim();
+                if (!string.IsNullOrWhiteSpace(trimmedAlias))
+                {
+                    _fieldMappings[trimmedAlias] = trimmedBase;
+                }
             }
         }
     }
 
     /// <summary>
-    /// Adds a name to the ignored list
+    /// Добавление нового полевого имени.
+    /// </summary>
+    /// <param name="baseName"> Базовое имя </param>
+    /// <param name="fieldName"> Полевое имя </param>
+    /// <returns>True successfull, false нет базового имени</returns>
+    public bool AddAliasToBase(string baseName, string fieldName)
+    {
+        var trimmedBase = baseName.Trim();
+        var trimmedField = fieldName.Trim();
+
+        if (!_baseNames.Contains(trimmedBase))
+        {
+            return false;
+        }
+        _fieldMappings[fieldName.Trim()] = trimmedBase;
+        return true;
+    }
+
+    /// <summary>
+    /// Adds a name to the ignored list.
     /// </summary>
     public bool AddIgnored(string name)
     {
         var trimmed = name.Trim();
 
-        // Remove from all aliases (prevents duplicate records)
-        RemoveFieldNameFromAllAliases(trimmed);
-
-        return IgnoredNames.Add(trimmed);
-    }
-    /// <summary>
-    /// Removes a field name from all alias lists
-    /// </summary>
-    private void RemoveFieldNameFromAllAliases(string fieldName)
-    {
-        foreach (var kvp in Aliases)
+        // Don't ignore base names
+        if (_baseNames.Contains(trimmed))
         {
-            kvp.Value.RemoveAlias(fieldName);
+            return false;
         }
+
+        // null value indicates ignored
+        _fieldMappings[trimmed] = null;
+        return true;
     }
+
     /// <summary>
-    /// Gets all base names
+    /// Removes a field name from all mappings.
+    /// </summary>
+    public bool RemoveFieldName(string fieldName)
+    {
+        var trimmed = fieldName.Trim();
+
+        // Don't remove base names
+        if (_baseNames.Contains(trimmed))
+        {
+            return false;
+        }
+
+        return _fieldMappings.Remove(trimmed);
+    }
+
+
+
+
+    /// <summary>
+    /// Gets all base names (for dropdown population).
     /// </summary>
     public IEnumerable<string> GetAllBaseNames()
     {
-        return Aliases.Keys.OrderBy(k => k);
+        return _baseNames.OrderBy(n => n);
     }
 
     /// <summary>
-    /// Gets statistics about the database
+    /// Gets all ignored names.
+    /// </summary>
+    public IEnumerable<string> GetAllIgnoredNames()
+    {
+        return _fieldMappings
+            .Where(kvp => kvp.Value == null)
+            .Select(kvp => kvp.Key)
+            .OrderBy(n => n);
+    }
+
+    /// <summary>
+    /// Gets all aliases for a specific base name.
+    /// </summary>
+    public IEnumerable<string> GetAliasesForBase(string baseName)
+    {
+        var trimmedBase = baseName.Trim();
+        return _fieldMappings
+            .Where(kvp => kvp.Value == trimmedBase && kvp.Key != trimmedBase)
+            .Select(kvp => kvp.Key)
+            .OrderBy(n => n);
+    }
+
+    /// <summary>
+    /// Gets all mappings grouped by base name (for export).
+    /// </summary>
+    public Dictionary<string, List<string>> GetAllAliasesGrouped()
+    {
+        var result = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var baseName in _baseNames)
+        {
+            result[baseName] = GetAliasesForBase(baseName).ToList();
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// Gets all ignored names as a HashSet (for export compatibility).
+    /// </summary>
+    public HashSet<string> GetIgnoredNamesSet()
+    {
+        return new HashSet<string>(GetAllIgnoredNames(), StringComparer.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// Gets statistics about the database.
     /// </summary>
     public (int BaseCount, int TotalAliases, int IgnoredCount) GetStatistics()
     {
-        int totalAliases = Aliases.Values.Sum(a => a.FieldNames.Count);
-        return (Aliases.Count, totalAliases, IgnoredNames.Count);
+        int baseCount = _baseNames.Count;
+        int ignoredCount = _fieldMappings.Count(kvp => kvp.Value == null);
+        int totalMappings = _fieldMappings.Count(kvp => kvp.Value != null);
+        int aliasCount = totalMappings - baseCount; // Subtract base names mapped to themselves
+
+        return (baseCount, aliasCount, ignoredCount);
+    }
+
+
+
+    /// <summary>
+    /// Clears all data from the database.
+    /// </summary>
+    public void Clear()
+    {
+        _fieldMappings.Clear();
+        _baseNames.Clear();
+    }
+
+    /// <summary>
+    /// Loads data from grouped aliases and ignored set (for CSV import).
+    /// </summary>
+    public void LoadFrom(Dictionary<string, List<string>> aliases, HashSet<string> ignored)
+    {
+        Clear();
+
+        foreach (var kvp in aliases)
+        {
+            AddBaseName(kvp.Key, kvp.Value);
+        }
+
+        foreach (var name in ignored)
+        {
+            AddIgnored(name);
+        }
+    }
+
+    public enum CurveClassification
+    {
+        Unknown,   // Not in dictionary
+        Ignored,   // In dictionary with null value
+        Mapped     // In dictionary with base name
+    }
+
+    /// <summary>
+    /// Classifies a field name and returns base name
+    /// </summary>
+    public (CurveClassification Classification, string? BaseName) Classify(string fieldName)
+    {
+        var trimmed = fieldName.Trim();
+
+        if (_fieldMappings.TryGetValue(trimmed, out var baseName))
+        {
+            return baseName == null
+                ? (CurveClassification.Ignored, null)
+                : (CurveClassification.Mapped, baseName);
+        }
+
+        return (CurveClassification.Unknown, null);
     }
 }
+
+
+
