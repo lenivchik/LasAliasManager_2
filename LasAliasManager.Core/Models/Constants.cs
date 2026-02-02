@@ -45,6 +45,13 @@ public static class Constants
         public const string Other = "OTHER";
         public const string Ascii = "ASCII";
         public const string Unknown = "UNKNOWN";
+
+        public const string VersionPrefix = "~V";
+        public const string WellPrefix = "~W";
+        public const string CurvePrefix = "~C";
+        public const string ParameterPrefix = "~P";
+        public const string OtherPrefix = "~O";
+        public const string AsciiPrefix = "~A";
     }
 
     /// <summary>
@@ -56,6 +63,8 @@ public static class Constants
         public const string Stop = "STOP";
         public const string Step = "STEP";
         public const string Well = "WELL";
+        public const string Null = "NULL";
+
     }
 
     /// <summary>
@@ -91,14 +100,75 @@ public static class Constants
         public const int PrimaryNameColumnWidth = 10;
     }
 
+
+    /// <summary>
+    /// File extensions used throughout the application
+    /// </summary>
+    public static class FileExtensions
+    {
+        public const string Las = ".las";
+        public const string LasUpper = ".LAS";
+        public const string Csv = ".csv";
+        public const string Txt = ".txt";
+
+        // File patterns for searching
+        public const string LasPattern = "*.las";
+        public const string LasPatternUpper = "*.LAS";
+        public const string CsvPattern = "*.csv";
+        public const string TxtPattern = "*.txt";
+    }
     public static class UiStrings
     {
         public const string StatusModified = "Изменен";
         public const string StatusUnknown = "Неизвестный";
         public const string StatusIgnored = "Игнорируется";
-        public const string StatusExported = "Экпортирован";
+        public const string StatusExported = "Экспортирован";
         public const string StatusMapped = "Сопоставлен";
+
+        // Status bar messages
+        public const string Ready = "Готов. Загрузите БД и выберите папку.";
+        public const string LoadingDatabase = "Загрузка БД...";
+        public const string AnalyzingFiles = "Анализ LAS файлов...";
+        public const string Saving = "Сохранение...";
+        public const string ExportingCurves = "Экспорт выбранных кривых...";
+
+        // Dialog titles
+        public const string ExportTitle = "Экспорт";
+        public const string ExportSuccessTitle = "Успешный экспорт";
+        public const string ExportErrorTitle = "Ошибка экспорта";
+        public const string UnsavedChangesTitle = "Несохраненные изменения";
+
+        // Dialog messages
+        public const string NoCurvesSelected = "Нет выбранных кривых для экспорта.\n Проставьте (✓) чтобы выбрать кривые.";
+        public const string NoBaseMappings = "У выбранных кривых отсутсвуют базовые имена.\n Укажите базовые имена...";
+        public const string UnsavedChangesPrompt = "Найдены несохраненные иземения. Сохранить их перед выходом?";
     }
 
+    /// <summary>
+    /// Number formatting constants
+    /// </summary>
+    public static class Formatting
+    {
+        public const string DepthFormat = "F2";
+        public const string StepFormat = "F4";
+        public const string FileSizeFormat = "0.##";
+
+        public static readonly string[] FileSizeUnits = { "B", "KB", "MB", "GB" };
+
+    }
+
+
+
+    public static class LasParser
+        {
+            public const char CommentChar = '#';
+            public const char SectionStartChar = '~';
+            public const char ColonSeparator = ':';
+            public const char DotSeparator = '.';
+            public const string DefaultPlaceholder = "-";
+        }
+
+
+    
 
 }

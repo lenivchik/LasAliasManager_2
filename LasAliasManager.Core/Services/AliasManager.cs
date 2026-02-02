@@ -1,5 +1,5 @@
 ﻿using LasAliasManager.Core.Models;
-using static AliasDatabase;
+using static LasAliasManager.Core.Models.AliasDatabase;
 
 namespace LasAliasManager.Core.Services;
 
@@ -31,8 +31,8 @@ public class AliasManager
     {
         Database = new AliasDatabase();
         DatabaseFilePath = csvFilePath;
-        var (aliases, ignored) = _csvParser.LoadCsvFile(csvFilePath);
-        Database.LoadFrom(aliases, ignored);
+        _csvParser.LoadInto(csvFilePath, Database);
+
     }
 
     /// <summary>
@@ -160,7 +160,6 @@ public class LasAnalysisResult
     public long FileSize { get; set; }
     public int TotalCurves { get; set; }
     public LasFileParser.WellInfo WellInfo { get; set; } = new();
-
     public List<LasFileParser.CurveDefinition> CurveDefinitions { get; set; } = new();
 
     /// <summary>

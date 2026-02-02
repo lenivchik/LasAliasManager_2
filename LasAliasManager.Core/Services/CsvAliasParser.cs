@@ -1,4 +1,5 @@
-﻿using System.Text;
+﻿using LasAliasManager.Core.Models;
+using System.Text;
 using System.Threading.Channels;
 using static LasAliasManager.Core.Constants;
 
@@ -24,46 +25,36 @@ public class CsvAliasParser
     /// Загрузка из CSV файла
     /// </summary>
     /// <returns>Возвращает списки с базовыми/полувыми именами и игнорируемыми (baseNames dictionary, ignoredNames set)</returns>
-    public (Dictionary<string, List<string>> Aliases, HashSet<string> Ignored) LoadCsvFile(string filePath)
+    /// <summary>
+    /// Loads aliases from a CSV file directly into an AliasDatabase
+    /// </summary>
+    public void LoadInto(string filePath, AliasDatabase database)
     {
-        var aliases = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
-        var ignored = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
         var records = ReadCsvRecords(filePath);
 
         foreach (var record in records)
         {
             switch (record.Status.ToLowerInvariant())
             {
-                //базовые имена
                 case Status.Base:
-                    if (!aliases.ContainsKey(record.FieldName))
-                    {
-                        aliases[record.FieldName] = new List<string>();
-                    }
+                    database.AddBaseName(record.FieldName);
                     break;
-                //полевые
+
                 case Status.Alias:
                     if (!string.IsNullOrWhiteSpace(record.PrimaryName))
                     {
-                        if (!aliases.ContainsKey(record.PrimaryName))
-                        {
-                            aliases[record.PrimaryName] = new List<string>();
-                        }
-                        if (!aliases[record.PrimaryName].Contains(record.FieldName, StringComparer.OrdinalIgnoreCase))
-                        {
-                            aliases[record.PrimaryName].Add(record.FieldName);
-                        }
+                        if (!database.IsBaseName(record.PrimaryName))
+                            database.AddBaseName(record.PrimaryName);
+
+                        database.AddAliasToBase(record.PrimaryName, record.FieldName);
                     }
                     break;
-                //игнорируемые
+
                 case Status.Ignore:
-                    ignored.Add(record.FieldName);
+                    database.AddIgnored(record.FieldName);
                     break;
             }
         }
-
-        return (aliases, ignored);
     }
 
     /// <summary>
@@ -81,7 +72,7 @@ public class CsvAliasParser
                 FieldName = baseName,
                 PrimaryName = baseName,
                 Status = Status.Base,
-                Description = ""
+                Description = string.Empty
             });
 
             // Полевые
@@ -94,7 +85,7 @@ public class CsvAliasParser
                         FieldName = alias,
                         PrimaryName = baseName,
                         Status = Status.Alias,
-                        Description = ""
+                        Description = string.Empty
                     });
                 }
             }
@@ -106,9 +97,9 @@ public class CsvAliasParser
             records.Add(new AliasRecord
             {
                 FieldName = name,
-                PrimaryName = "",
+                PrimaryName = string.Empty,
                 Status = Status.Ignore,
-                Description = ""
+                Description = string.Empty
             });
         }
 

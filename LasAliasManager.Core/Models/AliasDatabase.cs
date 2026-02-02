@@ -13,6 +13,15 @@ namespace LasAliasManager.Core.Models;
 
 public class AliasDatabase
 {
+
+    public enum CurveClassification
+    {
+        Unknown,   // Not in dictionary
+        Ignored,   // In dictionary with null value
+        Mapped     // In dictionary with base name
+    }
+
+
     /// <summary>
     ///Словарь:
     /// - Ключ: полевое имя
@@ -147,7 +156,7 @@ public class AliasDatabase
     /// </summary>
     public IEnumerable<string> GetAllBaseNames()
     {
-        return _baseNames.OrderBy(n => n);
+        return _baseNames.OrderBy(n => n, StringComparer.OrdinalIgnoreCase);
     }
 
     /// <summary>
@@ -158,7 +167,7 @@ public class AliasDatabase
         return _fieldMappings
             .Where(kvp => kvp.Value == null)
             .Select(kvp => kvp.Key)
-            .OrderBy(n => n);
+            .OrderBy(n => n, StringComparer.OrdinalIgnoreCase);
     }
 
     /// <summary>
@@ -170,7 +179,7 @@ public class AliasDatabase
         return _fieldMappings
             .Where(kvp => kvp.Value == trimmedBase && kvp.Key != trimmedBase)
             .Select(kvp => kvp.Key)
-            .OrderBy(n => n);
+            .OrderBy(n => n, StringComparer.OrdinalIgnoreCase);
     }
 
     /// <summary>
@@ -220,30 +229,6 @@ public class AliasDatabase
         _baseNames.Clear();
     }
 
-    /// <summary>
-    /// Loads data from grouped aliases and ignored set (for CSV import).
-    /// </summary>
-    public void LoadFrom(Dictionary<string, List<string>> aliases, HashSet<string> ignored)
-    {
-        Clear();
-
-        foreach (var kvp in aliases)
-        {
-            AddBaseName(kvp.Key, kvp.Value);
-        }
-
-        foreach (var name in ignored)
-        {
-            AddIgnored(name);
-        }
-    }
-
-    public enum CurveClassification
-    {
-        Unknown,   // Not in dictionary
-        Ignored,   // In dictionary with null value
-        Mapped     // In dictionary with base name
-    }
 
     /// <summary>
     /// Classifies a field name and returns base name

@@ -153,17 +153,17 @@ public class LasFileParser
     {
         var header = sectionHeader.ToUpperInvariant();
 
-        if (header.Contains(LasSections.Version) || header.StartsWith("~V"))
+        if (header.Contains(LasSections.Version) || header.StartsWith(LasSections.VersionPrefix))
             return LasSections.Version;
-        if (header.Contains(LasSections.Well) || header.StartsWith("~W"))
+        if (header.Contains(LasSections.Well) || header.StartsWith(LasSections.WellPrefix))
             return LasSections.Well;
-        if (header.Contains(LasSections.Curve) || header.StartsWith("~C"))
+        if (header.Contains(LasSections.Curve) || header.StartsWith(LasSections.CurvePrefix))
             return LasSections.Curve;
-        if (header.Contains(LasSections.Parameter) || header.StartsWith("~P"))
+        if (header.Contains(LasSections.Parameter) || header.StartsWith(LasSections.ParameterPrefix))
             return LasSections.Parameter;
-        if (header.Contains(LasSections.Other) || header.StartsWith("~O"))
+        if (header.Contains(LasSections.Other) || header.StartsWith(LasSections.OtherPrefix))
             return LasSections.Other;
-        if (header.Contains(LasSections.Ascii) || header.StartsWith("~A"))
+        if (header.Contains(LasSections.Ascii) || header.StartsWith(LasSections.AsciiPrefix))
             return LasSections.Ascii;
 
         return LasSections.Unknown;
