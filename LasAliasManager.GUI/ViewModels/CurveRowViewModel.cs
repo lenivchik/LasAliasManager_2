@@ -13,8 +13,10 @@ namespace LasAliasManager.GUI.ViewModels;
 public partial class CurveRowViewModel : ObservableObject
 {
     /// <summary>
-    /// Reference to available primary names for the ComboBox
+    /// Flag to prevent cascading updates between PrimaryName and SearchText
     /// </summary>
+    private bool _suppressSideEffects;
+
     /// <summary>
     /// Reference to available primary names for the ComboBox
     /// </summary>
@@ -46,6 +48,9 @@ public partial class CurveRowViewModel : ObservableObject
 
     partial void OnSearchTextChanged(string value)
     {
+        if (_suppressSideEffects)
+            return;
+
         RefreshFilteredPrimaryNames();
 
         // Open dropdown when user starts typing
@@ -62,15 +67,24 @@ public partial class CurveRowViewModel : ObservableObject
         OnPropertyChanged(nameof(StatusColor));
         OnModificationChanged?.Invoke();
 
-        // Update search text to match selected value
+        // Update search text to match selected value without triggering side effects
         if (value != null && value != SearchText)
         {
-            SearchText = value;
+            _suppressSideEffects = true;
+            try
+            {
+                SearchText = value;
+            }
+            finally
+            {
+                _suppressSideEffects = false;
+            }
         }
     }
 
     /// <summary>
-    /// Refreshes the filtered list based on search text
+    /// Refreshes the filtered list based on search text.
+    /// When search text matches the current PrimaryName, show all items (not filtered).
     /// </summary>
     public void RefreshFilteredPrimaryNames()
     {
@@ -80,9 +94,10 @@ public partial class CurveRowViewModel : ObservableObject
             return;
         }
 
-        if (string.IsNullOrWhiteSpace(SearchText))
+        // If search text is empty OR matches the current PrimaryName, show all items
+        if (string.IsNullOrWhiteSpace(SearchText) ||
+            SearchText.Equals(PrimaryName, StringComparison.OrdinalIgnoreCase))
         {
-            // Show all items when no search text
             FilteredPrimaryNames = new ObservableCollection<string>(AvailablePrimaryNames);
         }
         else
@@ -252,14 +267,6 @@ public partial class CurveRowViewModel : ObservableObject
     /// Callback when selection for export changes
     /// </summary>
     public Action? OnSelectionForExportChanged { get; set; }
-
-    //partial void OnPrimaryNameChanged(string? value)
-    //{
-    //    IsModified = value != OriginalPrimaryName;
-    //    OnPropertyChanged(nameof(StatusText));
-    //    OnPropertyChanged(nameof(StatusColor));
-    //    OnModificationChanged?.Invoke();
-    //}
 
     partial void OnIsSelectedForExportChanged(bool value)
     {

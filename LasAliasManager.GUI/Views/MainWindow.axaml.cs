@@ -112,7 +112,7 @@ public partial class MainWindow : Window
     {
         var box = MessageBoxManager.GetMessageBoxStandard(
             "О программе",
-            "LAS Curve Alias Manager v1.0\n\n" + 
+            "LAS Curve Alias Manager v1.0\n\n" +
             "Формат базы данных:\n" +
             "• CSV - единичный файл\n" +
             "Возможности:\n" +
@@ -122,7 +122,7 @@ public partial class MainWindow : Window
             "• Сохранение иземенеий в БД",
             ButtonEnum.Ok,
             MsBox.Avalonia.Enums.Icon.Info);
-        
+
         await box.ShowAsync();
     }
 
@@ -204,11 +204,15 @@ public partial class MainWindow : Window
     {
         if (sender is TextBox textBox && textBox.DataContext is CurveRowViewModel viewModel)
         {
-            // Show dropdown when textbox gets focus
+            // Ensure full list is available, then open dropdown
+            viewModel.RefreshFilteredPrimaryNames();
             if (viewModel.FilteredPrimaryNames?.Count > 0)
             {
                 viewModel.IsComboBoxOpen = true;
             }
+
+            // Select all text so user can start typing to filter immediately
+            textBox.SelectAll();
         }
     }
 
@@ -216,24 +220,24 @@ public partial class MainWindow : Window
     {
         if (sender is TextBox textBox && textBox.DataContext is CurveRowViewModel viewModel)
         {
-            // Small delay to allow click on list item
+            // Small delay to allow click on list item to register first
             Avalonia.Threading.Dispatcher.UIThread.Post(() =>
             {
-                // Update PrimaryName with the search text if it matches an item
+                // If dropdown is still open, the user clicked somewhere else — close it
+                viewModel.IsComboBoxOpen = false;
+
+                // Commit: update PrimaryName with the search text
                 if (!string.IsNullOrWhiteSpace(viewModel.SearchText))
                 {
                     var match = viewModel.AvailablePrimaryNames?.FirstOrDefault(
                         name => name.Equals(viewModel.SearchText, StringComparison.OrdinalIgnoreCase));
 
-                    if (match != null)
-                    {
-                        viewModel.PrimaryName = match;
-                    }
-                    else
-                    {
-                        // User typed something that doesn't match - treat as new value
-                        viewModel.PrimaryName = viewModel.SearchText;
-                    }
+                    viewModel.PrimaryName = match ?? viewModel.SearchText;
+                }
+                else
+                {
+                    // User cleared the text — set PrimaryName to empty
+                    viewModel.PrimaryName = string.Empty;
                 }
             }, Avalonia.Threading.DispatcherPriority.Background);
         }
@@ -243,9 +247,17 @@ public partial class MainWindow : Window
     {
         if (sender is Button button && button.DataContext is CurveRowViewModel viewModel)
         {
-            // Clear search to show all items
-            viewModel.SearchText = string.Empty;
-            viewModel.IsComboBoxOpen = !viewModel.IsComboBoxOpen;
+            if (viewModel.IsComboBoxOpen)
+            {
+                // Just close it
+                viewModel.IsComboBoxOpen = false;
+            }
+            else
+            {
+                // Show full unfiltered list without clearing the displayed text
+                viewModel.RefreshFilteredPrimaryNames();
+                viewModel.IsComboBoxOpen = true;
+            }
         }
     }
 
@@ -256,33 +268,12 @@ public partial class MainWindow : Window
             listBox.DataContext is CurveRowViewModel viewModel)
         {
             viewModel.PrimaryName = selectedName;
-            viewModel.SearchText = selectedName;
             viewModel.IsComboBoxOpen = false;
+
+            // Reset the listbox selection so the same item can be re-selected later
+            listBox.SelectedItem = null;
         }
     }
-
-    //private async void ExportListNamesAlias_Click(object? sender, RoutedEventArgs e)
-    //{
-    //    var topLevel = GetTopLevel(this);
-    //    if (topLevel == null) return;
-
-    //    var file = await topLevel.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
-    //    {
-    //        Title = "Export User-Defined to ListNamesAlias.txt",
-    //        DefaultExtension = "txt",
-    //        SuggestedFileName = "ListNamesAlias.txt",
-    //        FileTypeChoices = new[]
-    //        {
-    //            new FilePickerFileType("Text Files") { Patterns = new[] { "*.txt" } }
-    //        }
-    //    });
-
-    //    if (file == null) return;
-
-    //    await ViewModel.ExportListNamesAliasCommand.ExecuteAsync(file.Path.LocalPath);
-    //}
-
-
 
     protected override async void OnClosing(WindowClosingEventArgs e)
     {
