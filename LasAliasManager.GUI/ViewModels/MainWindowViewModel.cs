@@ -61,7 +61,7 @@ public partial class MainWindowViewModel : ObservableObject
     private ObservableCollection<string> _availablePrimaryNames = new();
 
     [ObservableProperty]
-    private string _statusMessage = "Готов. Загрузите БД и выберите папку.";
+    private string _statusMessage = UiStrings.Ready;
 
     [ObservableProperty]
     private bool _isLoading;
@@ -98,6 +98,19 @@ public partial class MainWindowViewModel : ObservableObject
 
     [ObservableProperty]
     private string _selectedCurveInfo = string.Empty;
+
+    /// <summary>
+    /// Whether there are curves selected for export that haven't been exported
+    /// </summary>
+    public bool HasUnexportedSelectedCurves
+    {
+        get
+        {
+            return LasFiles
+                .SelectMany(f => f.Curves)
+                .Any(c => c.IsSelectedForExport && !c.IsExported);
+        }
+    }
 
     /// <summary>
     /// Number of user-defined mappings available for export
@@ -392,6 +405,37 @@ public partial class MainWindowViewModel : ObservableObject
     }
 
 
+    //private CurveRowViewModel CreateCurveRow(string curveName, LasFileViewModel parentFile)
+    //{
+    //    var row = new CurveRowViewModel
+    //    {
+    //        AvailablePrimaryNames = AvailablePrimaryNames,
+    //        CurveFieldName = curveName
+    //    };
+
+    //    // Wire up modification callback
+    //    row.OnModificationChanged = () =>
+    //    {
+    //        // Defer status updates to avoid interfering with current UI operation
+    //        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+    //        {
+    //            parentFile.RefreshStatus();
+    //            UpdateHasUnsavedChanges();
+
+    //            // Update total unknown count
+    //            UnknownCurves = LasFiles.Sum(f => f.UnknownCount);
+    //        }, Avalonia.Threading.DispatcherPriority.Background);
+    //    };
+
+    //    // Wire up selection for export callback
+    //    row.OnSelectionForExportChanged = () =>
+    //    {
+    //        UpdateSelectedForExportCount();
+    //    };
+
+    //    return row;
+    //}
+
     private CurveRowViewModel CreateCurveRow(string curveName, LasFileViewModel parentFile)
     {
         var row = new CurveRowViewModel
@@ -399,6 +443,9 @@ public partial class MainWindowViewModel : ObservableObject
             AvailablePrimaryNames = AvailablePrimaryNames,
             CurveFieldName = curveName
         };
+
+        // Initialize filtered list
+        row.RefreshFilteredPrimaryNames();
 
         // Wire up modification callback
         row.OnModificationChanged = () =>
@@ -422,8 +469,6 @@ public partial class MainWindowViewModel : ObservableObject
 
         return row;
     }
-
-
     private void UpdateSelectedForExportCount()
     {
         SelectedForExportCount = LasFiles.Sum(f => f.Curves.Count(c => c.IsSelectedForExport));

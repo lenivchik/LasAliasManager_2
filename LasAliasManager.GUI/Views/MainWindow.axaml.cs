@@ -6,6 +6,7 @@ using MsBox.Avalonia;
 using MsBox.Avalonia.Enums;
 using System;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 
 namespace LasAliasManager.GUI.Views;
@@ -199,7 +200,66 @@ public partial class MainWindow : Window
         await ViewModel.ExportSelectedCurvesCommand.ExecuteAsync(file.Path.LocalPath);
     }
 
+    private void PrimaryNameTextBox_GotFocus(object? sender, Avalonia.Input.GotFocusEventArgs e)
+    {
+        if (sender is TextBox textBox && textBox.DataContext is CurveRowViewModel viewModel)
+        {
+            // Show dropdown when textbox gets focus
+            if (viewModel.FilteredPrimaryNames?.Count > 0)
+            {
+                viewModel.IsComboBoxOpen = true;
+            }
+        }
+    }
 
+    private void PrimaryNameTextBox_LostFocus(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (sender is TextBox textBox && textBox.DataContext is CurveRowViewModel viewModel)
+        {
+            // Small delay to allow click on list item
+            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+            {
+                // Update PrimaryName with the search text if it matches an item
+                if (!string.IsNullOrWhiteSpace(viewModel.SearchText))
+                {
+                    var match = viewModel.AvailablePrimaryNames?.FirstOrDefault(
+                        name => name.Equals(viewModel.SearchText, StringComparison.OrdinalIgnoreCase));
+
+                    if (match != null)
+                    {
+                        viewModel.PrimaryName = match;
+                    }
+                    else
+                    {
+                        // User typed something that doesn't match - treat as new value
+                        viewModel.PrimaryName = viewModel.SearchText;
+                    }
+                }
+            }, Avalonia.Threading.DispatcherPriority.Background);
+        }
+    }
+
+    private void ShowPrimaryNamesDropdown_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (sender is Button button && button.DataContext is CurveRowViewModel viewModel)
+        {
+            // Clear search to show all items
+            viewModel.SearchText = string.Empty;
+            viewModel.IsComboBoxOpen = !viewModel.IsComboBoxOpen;
+        }
+    }
+
+    private void PrimaryNameListBox_SelectionChanged(object? sender, Avalonia.Controls.SelectionChangedEventArgs e)
+    {
+        if (sender is ListBox listBox &&
+            listBox.SelectedItem is string selectedName &&
+            listBox.DataContext is CurveRowViewModel viewModel)
+        {
+            viewModel.PrimaryName = selectedName;
+            viewModel.SearchText = selectedName;
+            viewModel.IsComboBoxOpen = false;
+        }
+    }
 
     //private async void ExportListNamesAlias_Click(object? sender, RoutedEventArgs e)
     //{
@@ -233,19 +293,75 @@ public partial class MainWindow : Window
             return;
         }
 
-        if (!ViewModel.HasUnsavedChanges)
+        // Check for unsaved changes first
+        if (ViewModel.HasUnsavedChanges)
         {
-            base.OnClosing(e);
+            e.Cancel = true;
+
+            var box = MessageBoxManager.GetMessageBoxStandard(
+                "Несохраненные изменения",
+                "Найдены несохраненные изменения. Сохранить их перед выходом?",
+                ButtonEnum.YesNoCancel,
+                MsBox.Avalonia.Enums.Icon.Warning);
+
+            var result = await box.ShowAsync();
+
+            if (result == ButtonResult.Yes)
+            {
+                await ViewModel.SaveChangesCommand.ExecuteAsync(null);
+                // After saving, check for unexported curves
+                if (ViewModel.HasUnexportedSelectedCurves)
+                {
+                    // Reset flag to show the export warning
+                    await CheckUnexportedCurvesAsync(e);
+                }
+                else
+                {
+                    _closingConfirmed = true;
+                    Close();
+                }
+            }
+            else if (result == ButtonResult.No)
+            {
+                // User doesn't want to save changes, but check for unexported curves
+                if (ViewModel.HasUnexportedSelectedCurves)
+                {
+                    await CheckUnexportedCurvesAsync(e);
+                }
+                else
+                {
+                    _closingConfirmed = true;
+                    Close();
+                }
+            }
+            // Cancel — ничего не делаем
             return;
         }
 
-        // иначе показываем диалог
+        // No unsaved changes, check for unexported curves
+        if (ViewModel.HasUnexportedSelectedCurves)
+        {
+            await CheckUnexportedCurvesAsync(e);
+            return;
+        }
+
+        // No warnings needed, close normally
+        base.OnClosing(e);
+    }
+
+    private async Task CheckUnexportedCurvesAsync(WindowClosingEventArgs e)
+    {
         e.Cancel = true;
 
+        var unexportedCount = ViewModel.LasFiles
+            .SelectMany(f => f.Curves)
+            .Count(c => c.IsSelectedForExport && !c.IsExported);
+
         var box = MessageBoxManager.GetMessageBoxStandard(
-            "Несохраненные изменения",
-            "Найдены несохраненные иземения. Сохранить их перед выходом?",
-            ButtonEnum.YesNoCancel,
+            "Неэкспортированные кривые",
+            $"Имеются {unexportedCount} кривые, отмеченные для экспорта, но не экспортированные.\n\n" +
+            "Вы хотите закрыть приложение без экспорта?",
+            ButtonEnum.YesNo,
             MsBox.Avalonia.Enums.Icon.Warning);
 
         var result = await box.ShowAsync();
@@ -253,14 +369,8 @@ public partial class MainWindow : Window
         if (result == ButtonResult.Yes)
         {
             _closingConfirmed = true;
-            await ViewModel.SaveChangesCommand.ExecuteAsync(null);
-            Close(); // запускает OnClosing второй раз, но флаг блокирует диалог
+            Close();
         }
-        else if (result == ButtonResult.No)
-        {
-            _closingConfirmed = true;
-            Close(); // закрыть без сохранения
-        }
-        // Cancel — ничего не делаем
+        // No — ничего не делаем, пользователь вернется к приложению
     }
 }

@@ -1,6 +1,7 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
 using System;
 using System.Collections.ObjectModel;
+using System.Linq;
 using static LasAliasManager.Core.Constants;
 
 
@@ -14,8 +15,86 @@ public partial class CurveRowViewModel : ObservableObject
     /// <summary>
     /// Reference to available primary names for the ComboBox
     /// </summary>
+    /// <summary>
+    /// Reference to available primary names for the ComboBox
+    /// </summary>
     [ObservableProperty]
     private ObservableCollection<string>? _availablePrimaryNames;
+
+    /// <summary>
+    /// Filtered list based on current search text
+    /// </summary>
+    [ObservableProperty]
+    private ObservableCollection<string>? _filteredPrimaryNames;
+
+    /// <summary>
+    /// Search text for filtering primary names
+    /// </summary>
+    [ObservableProperty]
+    private string _searchText = string.Empty;
+
+    /// <summary>
+    /// Whether the ComboBox dropdown is open
+    /// </summary>
+    [ObservableProperty]
+    private bool _isComboBoxOpen;
+
+    partial void OnAvailablePrimaryNamesChanged(ObservableCollection<string>? value)
+    {
+        RefreshFilteredPrimaryNames();
+    }
+
+    partial void OnSearchTextChanged(string value)
+    {
+        RefreshFilteredPrimaryNames();
+
+        // Open dropdown when user starts typing
+        if (!string.IsNullOrEmpty(value))
+        {
+            IsComboBoxOpen = true;
+        }
+    }
+
+    partial void OnPrimaryNameChanged(string? value)
+    {
+        IsModified = value != OriginalPrimaryName;
+        OnPropertyChanged(nameof(StatusText));
+        OnPropertyChanged(nameof(StatusColor));
+        OnModificationChanged?.Invoke();
+
+        // Update search text to match selected value
+        if (value != null && value != SearchText)
+        {
+            SearchText = value;
+        }
+    }
+
+    /// <summary>
+    /// Refreshes the filtered list based on search text
+    /// </summary>
+    public void RefreshFilteredPrimaryNames()
+    {
+        if (AvailablePrimaryNames == null)
+        {
+            FilteredPrimaryNames = new ObservableCollection<string>();
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(SearchText))
+        {
+            // Show all items when no search text
+            FilteredPrimaryNames = new ObservableCollection<string>(AvailablePrimaryNames);
+        }
+        else
+        {
+            // Filter items that contain the search text (case-insensitive)
+            var filtered = AvailablePrimaryNames
+                .Where(name => name.Contains(SearchText, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+
+            FilteredPrimaryNames = new ObservableCollection<string>(filtered);
+        }
+    }
 
     /// <summary>
     /// The original curve field name from the LAS file
@@ -174,13 +253,13 @@ public partial class CurveRowViewModel : ObservableObject
     /// </summary>
     public Action? OnSelectionForExportChanged { get; set; }
 
-    partial void OnPrimaryNameChanged(string? value)
-    {
-        IsModified = value != OriginalPrimaryName;
-        OnPropertyChanged(nameof(StatusText));
-        OnPropertyChanged(nameof(StatusColor));
-        OnModificationChanged?.Invoke();
-    }
+    //partial void OnPrimaryNameChanged(string? value)
+    //{
+    //    IsModified = value != OriginalPrimaryName;
+    //    OnPropertyChanged(nameof(StatusText));
+    //    OnPropertyChanged(nameof(StatusColor));
+    //    OnModificationChanged?.Invoke();
+    //}
 
     partial void OnIsSelectedForExportChanged(bool value)
     {

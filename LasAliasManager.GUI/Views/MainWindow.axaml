@@ -13,7 +13,7 @@
 
     
     <Grid RowDefinitions="Auto,Auto,30,*,30,Auto">
-        <!-- Row 0: Menu Bar -->
+        <!-- 0: Menu -->
         <Menu Grid.Row="0">
             <MenuItem Header="Файл">
                 <MenuItem Header="Загрузить базу данных..." Click="LoadDatabase_Click"/>
@@ -37,7 +37,7 @@
             </MenuItem>
         </Menu>
 
-        <!-- Row 1: Toolbar -->
+        <!--1: Tools -->
         <Border Grid.Row="1" Background="#F0F0F0" Padding="8">
             <StackPanel Orientation="Horizontal" Spacing="8">
                 <Button Content="Загрузить базу данных" Click="LoadDatabase_Click" 
@@ -56,7 +56,7 @@
             </StackPanel>
         </Border>
 
-        <!-- Row 2: Info Panel (unsaved changes warning) -->
+        <!-- 2: Info Panel (unsaved changes warning) -->
         <Border Grid.Row="2" Background="#E8F4FD" Padding="8" 
                 IsVisible="{Binding HasUnsavedChanges}">
             <StackPanel Orientation="Horizontal" Spacing="8">
@@ -66,7 +66,7 @@
             </StackPanel>
         </Border>
 
-        <!-- Row 3: Main Content - Split View -->
+        <!-- 3: Main Content - Split View -->
         <Grid Grid.Row="3" ColumnDefinitions="300,Auto,*" Margin="8">
             
             <!-- Left Panel: File List -->
@@ -180,18 +180,58 @@
                                                 Width="150"
                                                 IsReadOnly="True"/>
                             
-                            <!-- Primary Name (ComboBox) -->
-                            <DataGridTemplateColumn Header="Основное имя" Width="180">
-                                <DataGridTemplateColumn.CellTemplate>
-                                    <DataTemplate x:DataType="vm:CurveRowViewModel">
-                                        <ComboBox ItemsSource="{Binding AvailablePrimaryNames}"
-                                                  Text="{Binding PrimaryName, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
-                                                  IsEditable="True"
-                                                  HorizontalAlignment="Stretch"
-                                                  Focusable="True"/>
-                                    </DataTemplate>
-                                </DataGridTemplateColumn.CellTemplate>
-                            </DataGridTemplateColumn>
+<!-- Primary Name (Enhanced ComboBox with Filtering) -->
+<DataGridTemplateColumn Header="Основное имя" Width="200">
+    <DataGridTemplateColumn.CellTemplate>
+        <DataTemplate x:DataType="vm:CurveRowViewModel">
+            <Grid ColumnDefinitions="*,Auto">
+                <!-- Editable TextBox for typing/filtering -->
+                <TextBox Grid.Column="0"
+                         Text="{Binding SearchText, Mode=TwoWay}"
+                         Watermark="Начните вводить для фильтрации..."
+                         VerticalContentAlignment="Center"
+                         GotFocus="PrimaryNameTextBox_GotFocus"
+                         LostFocus="PrimaryNameTextBox_LostFocus"/>
+                
+                <!-- Dropdown Button -->
+                <Button Grid.Column="1"
+                        Content="▼"
+                        Width="25"
+                        Padding="0"
+                        Click="ShowPrimaryNamesDropdown_Click"
+                        ToolTip.Tip="Показать все базовые имена"/>
+                
+                <!-- Popup with filtered list -->
+                <Popup Grid.Column="0"
+                       Grid.ColumnSpan="2"
+                       IsOpen="{Binding IsComboBoxOpen, Mode=TwoWay}"
+                       PlacementTarget="{Binding $parent[Grid]}"
+                       PlacementMode="Bottom"
+                       Width="{Binding $parent[Grid].Bounds.Width}"
+                       MaxHeight="300"
+                       IsLightDismissEnabled="True">
+                    <Border BorderBrush="Gray" 
+                            BorderThickness="1" 
+                            Background="White"
+                            CornerRadius="4"
+                            BoxShadow="0 4 8 0 #40000000">
+                        <ListBox ItemsSource="{Binding FilteredPrimaryNames}"
+                                 SelectionChanged="PrimaryNameListBox_SelectionChanged"
+                                 MaxHeight="280"
+                                 Background="White">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding}" 
+                                               Padding="8,4"/>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                    </Border>
+                </Popup>
+            </Grid>
+        </DataTemplate>
+    </DataGridTemplateColumn.CellTemplate>
+</DataGridTemplateColumn>
                             <!-- Status with color coding -->
                             <DataGridTemplateColumn Header="Статус">
                                 <DataGridTemplateColumn.CellTemplate>
