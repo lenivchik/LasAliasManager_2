@@ -60,6 +60,12 @@ public partial class CurveRowViewModel : ObservableObject
         }
     }
 
+    partial void OnPrimaryNameChanging(string? oldValue, string? newValue)
+    {
+        // Notify undo system before the value changes
+        OnBeforePrimaryNameChanged?.Invoke(this, oldValue);
+    }
+
     partial void OnPrimaryNameChanged(string? value)
     {
         IsModified = value != OriginalPrimaryName;
@@ -262,6 +268,11 @@ public partial class CurveRowViewModel : ObservableObject
     /// Callback when modification status changes
     /// </summary>
     public Action? OnModificationChanged { get; set; }
+
+    /// <summary>
+    /// Callback when PrimaryName is about to change — provides (curve, oldValue) for undo tracking.
+    /// </summary>
+    public Action<CurveRowViewModel, string?>? OnBeforePrimaryNameChanged { get; set; }
 
     /// <summary>
     /// Callback when selection for export changes

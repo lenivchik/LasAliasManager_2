@@ -25,6 +25,11 @@ public enum MessageType
 
 public partial class MainWindowViewModel : ObservableObject
 {
+    /// <summary>
+    /// Represents a single curve change for undo purposes
+    /// </summary>
+    private record UndoEntry(CurveRowViewModel Curve, string? PreviousPrimaryName);
+
     private readonly AliasManager _aliasManager;
 
     /// <summary>
@@ -38,9 +43,31 @@ public partial class MainWindowViewModel : ObservableObject
     private readonly HashSet<string> _userDefinedIgnored = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
+    /// Undo stack — each entry is a group of changes (single change or batch from Apply to All)
+    /// </summary>
+    private readonly Stack<List<UndoEntry>> _undoStack = new();
+
+    /// <summary>
+    /// Flag to suppress undo recording during undo/batch/load operations
+    /// </summary>
+    private bool _suppressUndoRecording;
+
+    /// <summary>
+    /// Accumulator for batch undo entries (used during Apply to All)
+    /// </summary>
+    private List<UndoEntry>? _batchUndoEntries;
+
+    /// <summary>
     /// Action to show message dialog (set by View)
     /// </summary>
     public Action<string, string, MessageType>? ShowMessageDialog { get; set; }
+
+    /// <summary>
+    /// Default export file path passed from command-line (second argument).
+    /// Used as suggested path in the export file picker dialog.
+    /// </summary>
+    [ObservableProperty]
+    private string? _defaultExportPath;
 
     [ObservableProperty]
     private ObservableCollection<LasFileViewModel> _lasFiles = new();
@@ -124,6 +151,18 @@ public partial class MainWindowViewModel : ObservableObject
 
     public bool HasDatabase => !string.IsNullOrEmpty(_aliasManager.DatabaseFilePath);
 
+    /// <summary>
+    /// Whether there are changes that can be undone
+    /// </summary>
+    public bool CanUndo => _undoStack.Count > 0;
+
+    /// <summary>
+    /// Description of the undo action count for button tooltip
+    /// </summary>
+    public string UndoDescription => _undoStack.Count > 0
+        ? $"Отменить ({_undoStack.Count})"
+        : "Нечего отменять";
+
 
     partial void OnSelectedCurveRowChanged(CurveRowViewModel? value)
     {
@@ -190,7 +229,6 @@ public partial class MainWindowViewModel : ObservableObject
             StatusMessage = $"База данных загружена: {stats.BaseCount} Основных имен, {stats.TotalAliases} Полевых имен, {stats.IgnoredCount} Игнорируются";
 
             // Re-analyze already loaded files if any
-
             if (!string.IsNullOrEmpty(CurrentFolderPath))
             {
                 await ReanalyzeLoadedFilesAsync();
@@ -210,66 +248,74 @@ public partial class MainWindowViewModel : ObservableObject
     {
         StatusMessage = "Анализ файлов...";
 
-        await Task.Run(() =>
+        _suppressUndoRecording = true;
+        try
         {
-            foreach (var fileVm in LasFiles)
+            await Task.Run(() =>
             {
-                var result = _aliasManager.AnalyzeLasFile(fileVm.FilePath);
-                if (result.HasError)
-                    continue;
-
-                // Update each curve's status
-                foreach (var curve in fileVm.Curves)
+                foreach (var fileVm in LasFiles)
                 {
-                    var fieldName = curve.CurveFieldName;
+                    var result = _aliasManager.AnalyzeLasFile(fileVm.FilePath);
+                    if (result.HasError)
+                        continue;
 
-                    if (_aliasManager.Database.IsIgnored(fieldName))
+                    // Update each curve's status
+                    foreach (var curve in fileVm.Curves)
                     {
-                        curve.OriginalPrimaryName = Markers.Ignore;
-                        curve.PrimaryName = Markers.Ignore;
-                        curve.IsUnknown = false;
-                        curve.IsIgnored = true;
-                    }
-                    else
-                    {
-                        var baseName = _aliasManager.Database.FindBaseName(fieldName);
-                        if (baseName != null)
+                        var fieldName = curve.CurveFieldName;
+
+                        if (_aliasManager.Database.IsIgnored(fieldName))
                         {
-                            curve.OriginalPrimaryName = baseName;
-                            curve.PrimaryName = baseName;
+                            curve.OriginalPrimaryName = Markers.Ignore;
+                            curve.PrimaryName = Markers.Ignore;
                             curve.IsUnknown = false;
-                            curve.IsIgnored = false;
+                            curve.IsIgnored = true;
                         }
                         else
                         {
-                            curve.OriginalPrimaryName = "";
-                            curve.PrimaryName = "";
-                            curve.IsUnknown = true;
-                            curve.IsIgnored = false;
+                            var baseName = _aliasManager.Database.FindBaseName(fieldName);
+                            if (baseName != null)
+                            {
+                                curve.OriginalPrimaryName = baseName;
+                                curve.PrimaryName = baseName;
+                                curve.IsUnknown = false;
+                                curve.IsIgnored = false;
+                            }
+                            else
+                            {
+                                curve.OriginalPrimaryName = "";
+                                curve.PrimaryName = "";
+                                curve.IsUnknown = true;
+                                curve.IsIgnored = false;
+                            }
                         }
+                        curve.IsModified = false;
                     }
-                    curve.IsModified = false;
+
+                    fileVm.RefreshStatus();
                 }
+            });
 
-                fileVm.RefreshStatus();
-            }
-        });
+            // Update totals
+            TotalCurves = LasFiles.Sum(f => f.CurveCount);
+            UnknownCurves = LasFiles.Sum(f => f.UnknownCount);
 
-        // Update totals
-        TotalCurves = LasFiles.Sum(f => f.CurveCount);
-        UnknownCurves = LasFiles.Sum(f => f.UnknownCount);
+            // Refresh current view
+            ApplyFileFilter();
+            ApplyCurveFilter();
+            UpdateHasUnsavedChanges();
 
-        // Refresh current view
-        ApplyFileFilter();
-        ApplyCurveFilter();
-        UpdateHasUnsavedChanges();
+            StatusMessage = $"Пере-анализировано {LasFiles.Count} файлов, сопоставлено {TotalCurves} кривых ({UnknownCurves} неизвестных )";
+        }
+        finally
+        {
+            _suppressUndoRecording = false;
+        }
 
-        StatusMessage = $"Пере-анализировано {LasFiles.Count} файлов, сопоставлено {TotalCurves} кривых ({UnknownCurves} неизвестных )";
+        _undoStack.Clear();
+        OnPropertyChanged(nameof(CanUndo));
+        OnPropertyChanged(nameof(UndoDescription));
     }
-
-
-
-  
 
     private void RefreshAvailablePrimaryNames()
     {
@@ -296,7 +342,9 @@ public partial class MainWindowViewModel : ObservableObject
             StatusMessage = "Анализ LAS файлов...";
             CurrentFolderPath = folderPath;
 
-            var results = await Task.Run(() => 
+            _suppressUndoRecording = true;
+
+            var results = await Task.Run(() =>
                 _aliasManager.AnalyzeDirectory(folderPath, IncludeSubfolders));
 
             LasFiles.Clear();
@@ -400,41 +448,13 @@ public partial class MainWindowViewModel : ObservableObject
         }
         finally
         {
+            _suppressUndoRecording = false;
+            _undoStack.Clear();
+            OnPropertyChanged(nameof(CanUndo));
+            OnPropertyChanged(nameof(UndoDescription));
             IsLoading = false;
         }
     }
-
-
-    //private CurveRowViewModel CreateCurveRow(string curveName, LasFileViewModel parentFile)
-    //{
-    //    var row = new CurveRowViewModel
-    //    {
-    //        AvailablePrimaryNames = AvailablePrimaryNames,
-    //        CurveFieldName = curveName
-    //    };
-
-    //    // Wire up modification callback
-    //    row.OnModificationChanged = () =>
-    //    {
-    //        // Defer status updates to avoid interfering with current UI operation
-    //        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
-    //        {
-    //            parentFile.RefreshStatus();
-    //            UpdateHasUnsavedChanges();
-
-    //            // Update total unknown count
-    //            UnknownCurves = LasFiles.Sum(f => f.UnknownCount);
-    //        }, Avalonia.Threading.DispatcherPriority.Background);
-    //    };
-
-    //    // Wire up selection for export callback
-    //    row.OnSelectionForExportChanged = () =>
-    //    {
-    //        UpdateSelectedForExportCount();
-    //    };
-
-    //    return row;
-    //}
 
     private CurveRowViewModel CreateCurveRow(string curveName, LasFileViewModel parentFile)
     {
@@ -446,6 +466,9 @@ public partial class MainWindowViewModel : ObservableObject
 
         // Initialize filtered list
         row.RefreshFilteredPrimaryNames();
+
+        // Wire up undo recording
+        row.OnBeforePrimaryNameChanged = RecordUndoChange;
 
         // Wire up modification callback
         row.OnModificationChanged = () =>
@@ -469,6 +492,7 @@ public partial class MainWindowViewModel : ObservableObject
 
         return row;
     }
+
     private void UpdateSelectedForExportCount()
     {
         SelectedForExportCount = LasFiles.Sum(f => f.Curves.Count(c => c.IsSelectedForExport));
@@ -625,41 +649,54 @@ public partial class MainWindowViewModel : ObservableObject
             }
 
             // Update ALL curves across ALL files that match the new mappings
-            foreach (var file in LasFiles)
+            _suppressUndoRecording = true;
+            try
             {
-                foreach (var curve in file.Curves)
+                foreach (var file in LasFiles)
                 {
-                    var fieldName = curve.CurveFieldName;
+                    foreach (var curve in file.Curves)
+                    {
+                        var fieldName = curve.CurveFieldName;
 
-                    // Check if this curve was just mapped
-                    if (newMappings.TryGetValue(fieldName, out var primaryName))
-                    {
-                        curve.OriginalPrimaryName = primaryName;
-                        curve.PrimaryName = primaryName;
-                        curve.IsModified = false;
-                        curve.IsUnknown = false;
-                        curve.IsIgnored = false;
+                        // Check if this curve was just mapped
+                        if (newMappings.TryGetValue(fieldName, out var primaryName))
+                        {
+                            curve.OriginalPrimaryName = primaryName;
+                            curve.PrimaryName = primaryName;
+                            curve.IsModified = false;
+                            curve.IsUnknown = false;
+                            curve.IsIgnored = false;
+                        }
+                        else if (newIgnored.Contains(fieldName))
+                        {
+                            curve.OriginalPrimaryName = Markers.Ignore;
+                            curve.PrimaryName = Markers.Ignore;
+                            curve.IsModified = false;
+                            curve.IsUnknown = false;
+                            curve.IsIgnored = true;
+                        }
+                        else if (curve.IsModified)
+                        {
+                            // This was a modified curve that we already processed
+                            curve.OriginalPrimaryName = curve.PrimaryName;
+                            curve.IsModified = false;
+                            curve.IsUnknown = string.IsNullOrEmpty(curve.PrimaryName);
+                            curve.IsIgnored = curve.PrimaryName == Markers.Ignore;
+                        }
                     }
-                    else if (newIgnored.Contains(fieldName))
-                    {
-                        curve.OriginalPrimaryName = Markers.Ignore;
-                        curve.PrimaryName = Markers.Ignore;
-                        curve.IsModified = false;
-                        curve.IsUnknown = false;
-                        curve.IsIgnored = true;
-                    }
-                    else if (curve.IsModified)
-                    {
-                        // This was a modified curve that we already processed
-                        curve.OriginalPrimaryName = curve.PrimaryName;
-                        curve.IsModified = false;
-                        curve.IsUnknown = string.IsNullOrEmpty(curve.PrimaryName);
-                        curve.IsIgnored = curve.PrimaryName == Markers.Ignore;
-                    }
+
+                    file.RefreshStatus();
                 }
-
-                file.RefreshStatus();
             }
+            finally
+            {
+                _suppressUndoRecording = false;
+            }
+
+            // Clear undo stack — original state has changed
+            _undoStack.Clear();
+            OnPropertyChanged(nameof(CanUndo));
+            OnPropertyChanged(nameof(UndoDescription));
 
             // Update totals
             UnknownCurves = LasFiles.Sum(f => f.UnknownCount);
@@ -678,8 +715,8 @@ public partial class MainWindowViewModel : ObservableObject
             IsLoading = false;
         }
     }
-    
-   [RelayCommand]
+
+    [RelayCommand]
     private void RefreshView()
     {
         foreach (var file in LasFiles)
@@ -690,6 +727,134 @@ public partial class MainWindowViewModel : ObservableObject
         ApplyCurveFilter();
     }
 
+    /// <summary>
+    /// Records a single curve change for undo. Called by CurveRowViewModel before PrimaryName changes.
+    /// </summary>
+    private void RecordUndoChange(CurveRowViewModel curve, string? oldValue)
+    {
+        if (_suppressUndoRecording) return;
+
+        var entry = new UndoEntry(curve, oldValue);
+
+        if (_batchUndoEntries != null)
+        {
+            // We're in a batch operation (Apply to All) — accumulate
+            _batchUndoEntries.Add(entry);
+        }
+        else
+        {
+            // Single change — push as its own group
+            _undoStack.Push(new List<UndoEntry> { entry });
+            OnPropertyChanged(nameof(CanUndo));
+            OnPropertyChanged(nameof(UndoDescription));
+        }
+    }
+
+    /// <summary>
+    /// Undo the last change (single step back)
+    /// </summary>
+    [RelayCommand]
+    private void UndoLastChange()
+    {
+        if (_undoStack.Count == 0) return;
+
+        var entries = _undoStack.Pop();
+
+        _suppressUndoRecording = true;
+        try
+        {
+            foreach (var entry in entries)
+            {
+                entry.Curve.PrimaryName = entry.PreviousPrimaryName;
+            }
+        }
+        finally
+        {
+            _suppressUndoRecording = false;
+        }
+
+        // Refresh UI
+        foreach (var file in LasFiles)
+        {
+            file.RefreshStatus();
+        }
+        UnknownCurves = LasFiles.Sum(f => f.UnknownCount);
+        UpdateHasUnsavedChanges();
+        ApplyFileFilter();
+        ApplyCurveFilter();
+
+        OnPropertyChanged(nameof(CanUndo));
+        OnPropertyChanged(nameof(UndoDescription));
+
+        StatusMessage = entries.Count == 1
+            ? $"Отменено изменение для {entries[0].Curve.CurveFieldName}"
+            : $"Отменено {entries.Count} изменений";
+    }
+
+    /// <summary>
+    /// Apply the selected curve's PrimaryName to ALL curves with the same field name across all files
+    /// </summary>
+    [RelayCommand]
+    private void ApplyToAll()
+    {
+        if (SelectedCurveRow == null || string.IsNullOrEmpty(SelectedCurveRow.PrimaryName))
+        {
+            StatusMessage = "Выберите кривую с назначенным основным именем";
+            return;
+        }
+
+        var fieldName = SelectedCurveRow.CurveFieldName;
+        var primaryName = SelectedCurveRow.PrimaryName;
+
+        // Find all curves with the same field name across all files (except the source)
+        var matchingCurves = LasFiles
+            .SelectMany(f => f.Curves)
+            .Where(c => c.CurveFieldName.Equals(fieldName, StringComparison.OrdinalIgnoreCase)
+                        && c != SelectedCurveRow
+                        && c.PrimaryName != primaryName)
+            .ToList();
+
+        if (matchingCurves.Count == 0)
+        {
+            StatusMessage = $"Нет других кривых с именем '{fieldName}' для применения";
+            return;
+        }
+
+        // Start batch undo recording
+        _batchUndoEntries = new List<UndoEntry>();
+
+        try
+        {
+            foreach (var curve in matchingCurves)
+            {
+                curve.PrimaryName = primaryName;
+            }
+        }
+        finally
+        {
+            // Commit batch to undo stack as single undoable action
+            if (_batchUndoEntries.Count > 0)
+            {
+                _undoStack.Push(_batchUndoEntries);
+                OnPropertyChanged(nameof(CanUndo));
+                OnPropertyChanged(nameof(UndoDescription));
+            }
+            _batchUndoEntries = null;
+        }
+
+        // Refresh UI
+        foreach (var file in LasFiles)
+        {
+            file.RefreshStatus();
+        }
+        UnknownCurves = LasFiles.Sum(f => f.UnknownCount);
+        UpdateHasUnsavedChanges();
+        ApplyFileFilter();
+        ApplyCurveFilter();
+
+        StatusMessage = $"'{primaryName}' применено к {matchingCurves.Count} кривым с именем '{fieldName}'";
+    }
+
     private void UpdateHasUnsavedChanges()
     {
         HasUnsavedChanges = LasFiles.Any(f => f.Curves.Any(c => c.IsModified));
@@ -698,14 +863,27 @@ public partial class MainWindowViewModel : ObservableObject
     [RelayCommand]
     private void ClearAllChanges()
     {
-        foreach (var file in LasFiles)
+        _suppressUndoRecording = true;
+        try
         {
-            foreach (var curve in file.Curves.Where(c => c.IsModified))
+            foreach (var file in LasFiles)
             {
-                curve.PrimaryName = curve.OriginalPrimaryName;
+                foreach (var curve in file.Curves.Where(c => c.IsModified))
+                {
+                    curve.PrimaryName = curve.OriginalPrimaryName;
+                }
+                file.RefreshStatus();
             }
-            file.RefreshStatus();
         }
+        finally
+        {
+            _suppressUndoRecording = false;
+        }
+
+        // Clear undo stack since we've reset everything
+        _undoStack.Clear();
+        OnPropertyChanged(nameof(CanUndo));
+        OnPropertyChanged(nameof(UndoDescription));
 
         UpdateHasUnsavedChanges();
         ApplyFileFilter();
@@ -918,18 +1096,14 @@ public partial class MainWindowViewModel : ObservableObject
             if (exportedMappingsList.Count > 0)
             {
                 messageLines.Add("Сопоставленные кривые:");
-                messageLines.AddRange(exportedMappingsList); // Limit to 20 items
-                //if (exportedMappingsList.Count > 20)
-                //    messageLines.Add($"... и еще {exportedMappingsList.Count - 20}");
+                messageLines.AddRange(exportedMappingsList);
             }
 
             if (exportedIgnoredList.Count > 0)
             {
                 messageLines.Add("");
                 messageLines.Add("Сопоставлены как игнорируемые:");
-                messageLines.AddRange(exportedIgnoredList); // Limit to 10 items
-                //if (exportedIgnoredList.Count > 10)
-                //    messageLines.Add($"... и еще {exportedIgnoredList.Count - 10}");
+                messageLines.AddRange(exportedIgnoredList);
             }
 
             StatusMessage = $"Экспортировано {totalCount} кривых в {Path.GetFileName(filePath)}";

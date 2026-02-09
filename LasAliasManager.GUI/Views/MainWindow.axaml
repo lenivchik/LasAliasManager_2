@@ -29,6 +29,11 @@
                 <MenuItem Header="Обновить страницу" Command="{Binding RefreshViewCommand}"/>
                 <MenuItem Header="Очистить все изменения" Command="{Binding ClearAllChangesCommand}"/>
                 <Separator/>
+                <MenuItem Header ="Применить ко всем" 
+        Command="{Binding ApplyToAllCommand}"
+        ToolTip.Tip="Применить основное имя выбранной кривой ко всем кривым с таким же полевым именем"/>
+                                <Separator/>
+
                 <MenuItem Header="Выбрать все в файле" Command="{Binding SelectAllCurvesCommand}"/>
                 <MenuItem Header="Отменить выбор" Command="{Binding DeselectAllCurvesCommand}"/>
             </MenuItem>
@@ -53,6 +58,10 @@
                           VerticalAlignment="Center"/>
                 <CheckBox Content="Показывать только неопределенные" IsChecked="{Binding ShowOnlyUnknown}"
                           VerticalAlignment="Center" Margin="16,0,0,0"/>
+                <Button Content="⟵ Назад" 
+        Command="{Binding UndoLastChangeCommand}" 
+        IsEnabled="{Binding CanUndo}"
+        ToolTip.Tip="{Binding UndoDescription}"/>
             </StackPanel>
         </Border>
 
