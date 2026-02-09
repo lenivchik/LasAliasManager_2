@@ -22,7 +22,23 @@ public partial class MainWindow : Window
         var viewModel = new MainWindowViewModel();
         viewModel.ShowMessageDialog = ShowMessageDialogAsync;
         DataContext = viewModel;
+        Opened += MainWindow_Opened;
+
     }
+    private async void MainWindow_Opened(object? sender, EventArgs e)
+    {
+        Opened -= MainWindow_Opened;
+
+        // First arg = directory with LAS files
+        if (Program.Args.Length > 0 && Directory.Exists(Program.Args[0]))
+        {
+            var folderPath = Program.Args[0];
+            ViewModel.CurrentFolderPath = folderPath;
+            await ViewModel.LoadFolderCommand.ExecuteAsync(folderPath);
+        }
+
+    }
+
     /// <summary>
     /// Shows a message dialog with appropriate icon based on message type
     /// </summary>

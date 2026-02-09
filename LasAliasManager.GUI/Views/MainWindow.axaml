@@ -233,7 +233,7 @@
     </DataGridTemplateColumn.CellTemplate>
 </DataGridTemplateColumn>
                             <!-- Status with color coding -->
-                            <DataGridTemplateColumn Header="Статус">
+                            <DataGridTemplateColumn Header="Статус" Width="150">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate x:DataType="vm:CurveRowViewModel">
                                         <TextBlock Text="{Binding StatusText}"
