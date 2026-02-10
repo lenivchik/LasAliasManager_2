@@ -792,31 +792,43 @@ public partial class MainWindowViewModel : ObservableObject
     }
 
     /// <summary>
-    /// Apply the selected curve's PrimaryName to ALL curves with the same field name across all files
+    /// Apply all assigned PrimaryNames from the current file's curves to matching curves across all other files
     /// </summary>
     [RelayCommand]
     private void ApplyToAll()
     {
-        if (SelectedCurveRow == null || string.IsNullOrEmpty(SelectedCurveRow.PrimaryName))
+        if (SelectedFile == null)
         {
-            StatusMessage = "Выберите кривую с назначенным основным именем";
+            StatusMessage = "Нет выбранного файла";
             return;
         }
 
-        var fieldName = SelectedCurveRow.CurveFieldName;
-        var primaryName = SelectedCurveRow.PrimaryName;
+        // Collect all curves in the current file that have a PrimaryName assigned
+        var sourceMappings = SelectedFile.Curves
+            .Where(c => !string.IsNullOrEmpty(c.PrimaryName))
+            .GroupBy(c => c.CurveFieldName, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(
+                g => g.Key,
+                g => g.First().PrimaryName!,
+                StringComparer.OrdinalIgnoreCase);
 
-        // Find all curves with the same field name across all files (except the source)
-        var matchingCurves = LasFiles
+        if (sourceMappings.Count == 0)
+        {
+            StatusMessage = "В текущем файле нет кривых с назначенными основными именами";
+            return;
+        }
+
+        // Find all curves in OTHER files that match by field name and need updating
+        var curvesToUpdate = LasFiles
+            .Where(f => f != SelectedFile)
             .SelectMany(f => f.Curves)
-            .Where(c => c.CurveFieldName.Equals(fieldName, StringComparison.OrdinalIgnoreCase)
-                        && c != SelectedCurveRow
-                        && c.PrimaryName != primaryName)
+            .Where(c => sourceMappings.TryGetValue(c.CurveFieldName, out var targetName)
+                        && c.PrimaryName != targetName)
             .ToList();
 
-        if (matchingCurves.Count == 0)
+        if (curvesToUpdate.Count == 0)
         {
-            StatusMessage = $"Нет других кривых с именем '{fieldName}' для применения";
+            StatusMessage = "Нет кривых в других файлах для применения";
             return;
         }
 
@@ -825,9 +837,9 @@ public partial class MainWindowViewModel : ObservableObject
 
         try
         {
-            foreach (var curve in matchingCurves)
+            foreach (var curve in curvesToUpdate)
             {
-                curve.PrimaryName = primaryName;
+                curve.PrimaryName = sourceMappings[curve.CurveFieldName];
             }
         }
         finally
@@ -852,7 +864,7 @@ public partial class MainWindowViewModel : ObservableObject
         ApplyFileFilter();
         ApplyCurveFilter();
 
-        StatusMessage = $"'{primaryName}' применено к {matchingCurves.Count} кривым с именем '{fieldName}'";
+        StatusMessage = $"Применено {curvesToUpdate.Count} изменений из '{SelectedFile.FileName}' к другим файлам";
     }
 
     private void UpdateHasUnsavedChanges()

@@ -8,6 +8,8 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using MsBox.Avalonia.Dto;
+using MsBox.Avalonia.Models;
 
 namespace LasAliasManager.GUI.Views;
 
@@ -305,15 +307,23 @@ public partial class MainWindow : Window
         {
             e.Cancel = true;
 
-            var box = MessageBoxManager.GetMessageBoxStandard(
-                "Несохраненные изменения",
-                "Найдены несохраненные изменения. Сохранить их перед выходом?",
-                ButtonEnum.YesNoCancel,
-                MsBox.Avalonia.Enums.Icon.Warning);
+            var box = MessageBoxManager.GetMessageBoxCustom(new MessageBoxCustomParams
+            {
+                ContentTitle = "Несохраненные изменения",
+                ContentMessage = "Найдены несохраненные изменения. Сохранить их перед выходом?",
+                Icon = MsBox.Avalonia.Enums.Icon.Warning,
+                ButtonDefinitions = new[]
+                    {
+                        new ButtonDefinition { Name = "Да", IsDefault = true },
+                        new ButtonDefinition { Name = "Нет" },
+                        new ButtonDefinition { Name = "Отмена", IsCancel = true }
+                    },
+                WindowStartupLocation = WindowStartupLocation.CenterOwner
+            });
 
-            var result = await box.ShowAsync();
+            var result = await box.ShowWindowDialogAsync(this);
 
-            if (result == ButtonResult.Yes)
+            if (result == "Да")
             {
                 await ViewModel.SaveChangesCommand.ExecuteAsync(null);
                 // After saving, check for unexported curves
@@ -328,7 +338,7 @@ public partial class MainWindow : Window
                     Close();
                 }
             }
-            else if (result == ButtonResult.No)
+            else if (result == "Нет")
             {
                 // User doesn't want to save changes, but check for unexported curves
                 if (ViewModel.HasUnexportedSelectedCurves)
@@ -364,17 +374,26 @@ public partial class MainWindow : Window
             .SelectMany(f => f.Curves)
             .Count(c => c.IsSelectedForExport && !c.IsExported);
 
-        var box = MessageBoxManager.GetMessageBoxStandard(
-            "Неэкспортированные кривые",
-            $"Имеются {unexportedCount} кривые, отмеченные для экспорта, но не экспортированные.\n\n" +
-            "Вы хотите закрыть приложение без экспорта?",
-            ButtonEnum.YesNo,
-            MsBox.Avalonia.Enums.Icon.Warning);
 
-        var result = await box.ShowAsync();
 
-        if (result == ButtonResult.Yes)
+        var box = MessageBoxManager.GetMessageBoxCustom(new MessageBoxCustomParams
         {
+            ContentTitle = "Неэкспортированные кривые",
+            ContentMessage = $"Имеются {unexportedCount} кривые, отмеченные для экспорта, но не экспортированные.\n\n" +
+            "Вы хотите закрыть приложение без экспорта?",
+            Icon = MsBox.Avalonia.Enums.Icon.Warning,
+            ButtonDefinitions = new[]
+    {
+        new ButtonDefinition { Name = "Да", IsDefault = true },
+        new ButtonDefinition { Name = "Нет" }
+    },
+            WindowStartupLocation = WindowStartupLocation.CenterOwner
+        });
+
+        var result = await box.ShowWindowDialogAsync(this);
+
+        if (result == "Да") { 
+
             _closingConfirmed = true;
             Close();
         }
