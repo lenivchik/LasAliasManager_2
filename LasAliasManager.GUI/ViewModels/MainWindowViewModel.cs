@@ -224,6 +224,11 @@ public partial class MainWindowViewModel : ObservableObject
                 _aliasManager.LoadFromCsv(csvPath);
             });
 
+            // Clear stale session tracking from previous database
+            _userDefinedMappings.Clear();
+            _userDefinedIgnored.Clear();
+            OnPropertyChanged(nameof(UserDefinedCount));
+
             DatabaseFilePath = csvPath;
             RefreshAvailablePrimaryNames();
 
@@ -348,7 +353,10 @@ public partial class MainWindowViewModel : ObservableObject
 
             var results = await Task.Run(() =>
                 _aliasManager.AnalyzeDirectory(folderPath, IncludeSubfolders));
-
+            foreach (var file in LasFiles)
+            {
+                CleanupFileCallbacks(file);
+            }
             LasFiles.Clear();
             int totalUnknown = 0;
             int totalCurvesCount = 0;
@@ -1207,5 +1215,16 @@ public partial class MainWindowViewModel : ObservableObject
             }
         }
         UpdateSelectedForExportCount();
+    }
+
+
+    private void CleanupFileCallbacks(LasFileViewModel file)
+    {
+        foreach (var curve in file.Curves)
+        {
+            curve.OnModificationChanged = null;
+            curve.OnBeforePrimaryNameChanged = null;
+            curve.OnSelectionForExportChanged = null;
+        }
     }
 }
