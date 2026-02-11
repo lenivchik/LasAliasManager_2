@@ -111,7 +111,7 @@ public class LasFileParser
         var searchOption = recursive ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly;
         return Directory.GetFiles(directory, "*.las", searchOption)
                        .Concat(Directory.GetFiles(directory, "*.LAS", searchOption))
-                       .Distinct();
+                       .Distinct(StringComparer.OrdinalIgnoreCase);
     }
 
     private void ProcessWellInfo(Dictionary<string, (string Value, string Unit)> wellInfoDict, WellInfo wellInfo)

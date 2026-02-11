@@ -215,7 +215,6 @@
                        Grid.ColumnSpan="2"
                        IsOpen="{Binding IsComboBoxOpen, Mode=TwoWay}"
                        PlacementTarget="{Binding $parent[Grid]}"
-                       PlacementMode="Bottom"
                        Width="{Binding $parent[Grid].Bounds.Width}"
                        MaxHeight="300"
                        IsLightDismissEnabled="True">
