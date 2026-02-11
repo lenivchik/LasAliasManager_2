@@ -69,6 +69,24 @@ public partial class CurveRowViewModel : ObservableObject
     partial void OnPrimaryNameChanged(string? value)
     {
         IsModified = value != OriginalPrimaryName;
+
+        // Reactively update classification based on assigned name
+        if (string.IsNullOrEmpty(value))
+        {
+            IsUnknown = true;
+            IsIgnored = false;
+        }
+        else if (value == Markers.Ignore)
+        {
+            IsUnknown = false;
+            IsIgnored = true;
+        }
+        else
+        {
+            IsUnknown = false;
+            IsIgnored = false;
+        }
+
         OnPropertyChanged(nameof(StatusText));
         OnPropertyChanged(nameof(StatusColor));
         OnModificationChanged?.Invoke();
@@ -87,6 +105,8 @@ public partial class CurveRowViewModel : ObservableObject
             }
         }
     }
+
+
 
     /// <summary>
     /// Refreshes the filtered list based on search text.

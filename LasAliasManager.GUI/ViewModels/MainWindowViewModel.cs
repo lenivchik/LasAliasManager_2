@@ -126,6 +126,8 @@ public partial class MainWindowViewModel : ObservableObject
     [ObservableProperty]
     private string _selectedCurveInfo = string.Empty;
 
+    private bool _suppressStatusUpdates;
+
     /// <summary>
     /// Whether there are curves selected for export that haven't been exported
     /// </summary>
@@ -473,21 +475,20 @@ public partial class MainWindowViewModel : ObservableObject
         // Wire up modification callback
         row.OnModificationChanged = () =>
         {
-            // Defer status updates to avoid interfering with current UI operation
+            if (_suppressStatusUpdates) return;  // skip during batch
+
             Avalonia.Threading.Dispatcher.UIThread.Post(() =>
             {
                 parentFile.RefreshStatus();
                 UpdateHasUnsavedChanges();
-
-                // Update total unknown count
                 UnknownCurves = LasFiles.Sum(f => f.UnknownCount);
             }, Avalonia.Threading.DispatcherPriority.Background);
-        };
 
-        // Wire up selection for export callback
-        row.OnSelectionForExportChanged = () =>
+            // Wire up selection for export callback
+            row.OnSelectionForExportChanged = () =>
         {
             UpdateSelectedForExportCount();
+        };
         };
 
         return row;
@@ -504,7 +505,6 @@ public partial class MainWindowViewModel : ObservableObject
 
         if (ShowOnlyUnknown)
         {
-            // Only show files that have unknown or modified curves
             filtered = filtered.Where(f => f.HasUnknown || f.HasModified);
         }
 
@@ -516,9 +516,8 @@ public partial class MainWindowViewModel : ObservableObject
                 f.Curves.Any(c => c.CurveFieldName.Contains(filter, StringComparison.OrdinalIgnoreCase)));
         }
 
-        FilteredFiles = new ObservableCollection<LasFileViewModel>(filtered);
+        UpdateCollectionInPlace(FilteredFiles, filtered.ToList());
 
-        // If currently selected file is no longer in filtered list, select first available
         if (SelectedFile != null && !FilteredFiles.Contains(SelectedFile))
         {
             SelectedFile = FilteredFiles.FirstOrDefault();
@@ -529,7 +528,7 @@ public partial class MainWindowViewModel : ObservableObject
     {
         if (SelectedFile == null)
         {
-            FilteredCurves = new ObservableCollection<CurveRowViewModel>();
+            FilteredCurves.Clear();
             return;
         }
 
@@ -548,8 +547,61 @@ public partial class MainWindowViewModel : ObservableObject
                 (c.PrimaryName?.Contains(filter, StringComparison.OrdinalIgnoreCase) ?? false));
         }
 
-        FilteredCurves = new ObservableCollection<CurveRowViewModel>(filtered);
+        var desiredItems = filtered.ToList();
+
+        // In-place sync: remove items not in desired set, add missing ones
+        UpdateCollectionInPlace(FilteredCurves, desiredItems);
+
         UpdateHasUnsavedChanges();
+    }
+
+    /// <summary>
+    /// Synchronizes an ObservableCollection to match a target list
+    /// without recreating it, preserving DataGrid scroll position.
+    /// </summary>
+    private static void UpdateCollectionInPlace<T>(
+        ObservableCollection<T> collection,
+        List<T> desired)
+    {
+        // Remove items not in desired set
+        var desiredSet = new HashSet<T>(desired);
+        for (int i = collection.Count - 1; i >= 0; i--)
+        {
+            if (!desiredSet.Contains(collection[i]))
+            {
+                collection.RemoveAt(i);
+            }
+        }
+
+        // Add/reorder to match desired
+        var existingSet = new HashSet<T>(collection);
+        int insertIndex = 0;
+        foreach (var item in desired)
+        {
+            if (insertIndex < collection.Count &&
+                EqualityComparer<T>.Default.Equals(collection[insertIndex], item))
+            {
+                // Already in correct position
+                insertIndex++;
+            }
+            else if (existingSet.Contains(item))
+            {
+                // Item exists but in wrong position — move it
+                var currentIndex = collection.IndexOf(item);
+                if (currentIndex != insertIndex)
+                {
+                    collection.Move(currentIndex, insertIndex);
+                }
+                insertIndex++;
+            }
+            else
+            {
+                // New item — insert at correct position
+                collection.Insert(insertIndex, item);
+                existingSet.Add(item);
+                insertIndex++;
+            }
+        }
     }
 
     [RelayCommand]
@@ -803,7 +855,6 @@ public partial class MainWindowViewModel : ObservableObject
             return;
         }
 
-        // Collect all curves in the current file that have a PrimaryName assigned
         var sourceMappings = SelectedFile.Curves
             .Where(c => !string.IsNullOrEmpty(c.PrimaryName))
             .GroupBy(c => c.CurveFieldName, StringComparer.OrdinalIgnoreCase)
@@ -818,13 +869,12 @@ public partial class MainWindowViewModel : ObservableObject
             return;
         }
 
-        // Find all curves in OTHER files that match by field name and need updating
         var curvesToUpdate = LasFiles
             .Where(f => f != SelectedFile)
             .SelectMany(f => f.Curves)
             .Where(c => sourceMappings.TryGetValue(c.CurveFieldName, out var targetName)
                         && c.PrimaryName != targetName)
-            .ToList();
+            .ToList();  // materialize before modifying
 
         if (curvesToUpdate.Count == 0)
         {
@@ -832,8 +882,10 @@ public partial class MainWindowViewModel : ObservableObject
             return;
         }
 
-        // Start batch undo recording
+        // Suppress per-curve deferred UI updates during batch
+        _suppressUndoRecording = false; // undo still needed
         _batchUndoEntries = new List<UndoEntry>();
+        _suppressStatusUpdates = true;  // NEW FLAG
 
         try
         {
@@ -844,7 +896,8 @@ public partial class MainWindowViewModel : ObservableObject
         }
         finally
         {
-            // Commit batch to undo stack as single undoable action
+            _suppressStatusUpdates = false;
+
             if (_batchUndoEntries.Count > 0)
             {
                 _undoStack.Push(_batchUndoEntries);
@@ -854,7 +907,7 @@ public partial class MainWindowViewModel : ObservableObject
             _batchUndoEntries = null;
         }
 
-        // Refresh UI
+        // One synchronous refresh — no stale counts
         foreach (var file in LasFiles)
         {
             file.RefreshStatus();
@@ -866,7 +919,6 @@ public partial class MainWindowViewModel : ObservableObject
 
         StatusMessage = $"Применено {curvesToUpdate.Count} изменений из '{SelectedFile.FileName}' к другим файлам";
     }
-
     private void UpdateHasUnsavedChanges()
     {
         HasUnsavedChanges = LasFiles.Any(f => f.Curves.Any(c => c.IsModified));
