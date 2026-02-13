@@ -11,7 +11,7 @@ namespace LasAliasManager.Core.Services;
 public class CsvAliasParser
 {
     /// <summary>
-    /// Элемент БД 
+    /// Элемент БД
     /// </summary>
     public class AliasRecord
     {
@@ -22,11 +22,7 @@ public class CsvAliasParser
     }
 
     /// <summary>
-    /// Загрузка из CSV файла
-    /// </summary>
-    /// <returns>Возвращает списки с базовыми/полувыми именами и игнорируемыми (baseNames dictionary, ignoredNames set)</returns>
-    /// <summary>
-    /// Loads aliases from a CSV file directly into an AliasDatabase
+    /// Загружает псевдонимы из CSV файла непосредственно в AliasDatabase
     /// </summary>
     public void LoadInto(string filePath, AliasDatabase database)
     {
@@ -75,7 +71,7 @@ public class CsvAliasParser
                 Description = string.Empty
             });
 
-            // Полевые
+            // Полевые имена
             foreach (var alias in aliases[baseName].OrderBy(a => a))
             {
                 if (!alias.Equals(baseName, StringComparison.OrdinalIgnoreCase))
@@ -118,7 +114,7 @@ public class CsvAliasParser
 
         foreach (var line in lines)
         {
-            // Skip header line
+            // Пропускаем заголовок
             if (isFirstLine)
             {
                 isFirstLine = false;
@@ -129,7 +125,7 @@ public class CsvAliasParser
                 continue;
 
             var fields = ParseCsvLine(line);
-            // Смотрим количество записей 
+            // Проверяем количество полей
             if (fields.Length >= CsvHeaders.MinimumColumns)
             {
                 records.Add(new AliasRecord
@@ -144,8 +140,9 @@ public class CsvAliasParser
 
         return records;
     }
+
     /// <summary>
-    /// Сохранение в CSV
+    /// Запись в CSV файл
     /// </summary>
     private void WriteCsvFile(string filePath, List<AliasRecord> records)
     {
@@ -160,6 +157,9 @@ public class CsvAliasParser
         }
     }
 
+    /// <summary>
+    /// Разбирает строку CSV с учётом кавычек
+    /// </summary>
     private string[] ParseCsvLine(string line)
     {
         var fields = new List<string>();
@@ -174,11 +174,11 @@ public class CsvAliasParser
             {
                 if (c == '"')
                 {
-                    // Check for escaped quote
+                    // Проверяем экранированную кавычку
                     if (i + 1 < line.Length && line[i + 1] == '"')
                     {
                         currentField.Append('"');
-                        i++; // Skip next quote
+                        i++; // Пропускаем следующую кавычку
                     }
                     else
                     {
@@ -208,12 +208,15 @@ public class CsvAliasParser
             }
         }
 
-        // Add last field
+        // Добавляем последнее поле
         fields.Add(currentField.ToString());
 
         return fields.ToArray();
     }
 
+    /// <summary>
+    /// Экранирует значение для CSV (оборачивает в кавычки при необходимости)
+    /// </summary>
     private string EscapeCsv(string value)
     {
         if (string.IsNullOrEmpty(value))

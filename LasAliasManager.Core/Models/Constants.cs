@@ -6,7 +6,7 @@
 public static class Constants
 {
     /// <summary>
-    /// Основные базовые имена
+    /// Основные маркеры для выпадающего списка
     /// </summary>
     public static class Markers
     {
@@ -26,7 +26,7 @@ public static class Constants
     }
 
     /// <summary>
-    /// Базовое имя для экспорта
+    /// Базовое имя для экспорта игнорируемых
     /// </summary>
     public static class PrimaryNames
     {
@@ -34,7 +34,7 @@ public static class Constants
     }
 
     /// <summary>
-    /// Идеентификаторы в las файле
+    /// Идентификаторы секций в LAS файле
     /// </summary>
     public static class LasSections
     {
@@ -55,7 +55,7 @@ public static class Constants
     }
 
     /// <summary>
-    /// Секция "Well"
+    /// Поля секции "Well"
     /// </summary>
     public static class WellFields
     {
@@ -68,7 +68,7 @@ public static class Constants
     }
 
     /// <summary>
-    /// Null значения
+    /// Null значения в LAS файлах
     /// </summary>
     public static readonly string[] LasNullValues =
     {
@@ -76,7 +76,7 @@ public static class Constants
     };
 
     /// <summary>
-    ///  Струтура CSV файла
+    /// Структура CSV файла
     /// </summary>
     public static class CsvHeaders
     {
@@ -102,7 +102,7 @@ public static class Constants
 
 
     /// <summary>
-    /// File extensions used throughout the application
+    /// Расширения файлов, используемые в приложении
     /// </summary>
     public static class FileExtensions
     {
@@ -111,12 +111,16 @@ public static class Constants
         public const string Csv = ".csv";
         public const string Txt = ".txt";
 
-        // File patterns for searching
+        // Шаблоны поиска файлов
         public const string LasPattern = "*.las";
         public const string LasPatternUpper = "*.LAS";
         public const string CsvPattern = "*.csv";
         public const string TxtPattern = "*.txt";
     }
+
+    /// <summary>
+    /// Строки пользовательского интерфейса
+    /// </summary>
     public static class UiStrings
     {
         public const string StatusModified = "Изменен";
@@ -125,27 +129,27 @@ public static class Constants
         public const string StatusExported = "Экспортирован";
         public const string StatusMapped = "Сопоставлен";
 
-        // Status bar messages
+        // Сообщения статусной строки
         public const string Ready = "Готов. Загрузите БД и выберите папку.";
         public const string LoadingDatabase = "Загрузка БД...";
         public const string AnalyzingFiles = "Анализ LAS файлов...";
         public const string Saving = "Сохранение...";
         public const string ExportingCurves = "Экспорт выбранных кривых...";
 
-        // Dialog titles
+        // Заголовки диалогов
         public const string ExportTitle = "Экспорт";
         public const string ExportSuccessTitle = "Успешный экспорт";
         public const string ExportErrorTitle = "Ошибка экспорта";
         public const string UnsavedChangesTitle = "Несохраненные изменения";
 
-        // Dialog messages
+        // Сообщения диалогов
         public const string NoCurvesSelected = "Нет выбранных кривых для экспорта.\n Проставьте (✓) чтобы выбрать кривые.";
         public const string NoBaseMappings = "У выбранных кривых отсутсвуют базовые имена.\n Укажите базовые имена...";
         public const string UnsavedChangesPrompt = "Найдены несохраненные иземения. Сохранить их перед выходом?";
     }
 
     /// <summary>
-    /// Number formatting constants
+    /// Константы форматирования чисел
     /// </summary>
     public static class Formatting
     {
@@ -153,12 +157,15 @@ public static class Constants
         public const string StepFormat = "F4";
         public const string FileSizeFormat = "0.##";
 
-        public static readonly string[] FileSizeUnits = { "B", "KB", "MB", "GB" };
+        public static readonly string[] FileSizeUnits = { "Б", "КБ", "МБ", "ГБ" };
 
     }
 
 
 
+    /// <summary>
+    /// Константы парсера LAS файлов
+    /// </summary>
     public static class LasParser
         {
             public const char CommentChar = '#';

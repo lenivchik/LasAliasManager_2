@@ -5,7 +5,7 @@ using static LasAliasManager.Core.Constants;
 namespace LasAliasManager.Core.Services;
 
 /// <summary>
-/// Парсинг LAS файла для извлечения информации о нем
+/// Парсинг LAS файла для извлечения информации о нём
 /// </summary>
 public class LasFileParser
 {
@@ -26,7 +26,7 @@ public class LasFileParser
     }
 
     /// <summary>
-    /// well information
+    /// Информация о скважине
     /// </summary>
     public class WellInfo
     {
@@ -37,7 +37,7 @@ public class LasFileParser
     }
 
     /// <summary>
-    ///parsed content of LAS file
+    /// Разобранное содержимое LAS файла
     /// </summary>
     public class LasFileContent
     {
@@ -50,7 +50,7 @@ public class LasFileParser
     }
 
     /// <summary>
-    /// Parses a LAS file and extracts curve information
+    /// Парсит LAS файл и извлекает информацию о кривых
     /// </summary>
     public LasFileContent ParseLasFile(string filePath)
     {
@@ -59,7 +59,6 @@ public class LasFileParser
             FilePath = filePath,
             FileSize = new FileInfo(filePath).Length
         };
-        //var lines = ReadFileLines(filePath);
         var lines = FileEncoder.ReadFileLines(filePath);
         string currentSection = string.Empty;
         var wellInfoDict = new Dictionary<string, (string Value, string Unit)>(StringComparer.OrdinalIgnoreCase);
@@ -104,7 +103,7 @@ public class LasFileParser
     }
 
     /// <summary>
-    /// Scans a directory for LAS files
+    /// Ищет LAS файлы в директории
     /// </summary>
     public IEnumerable<string> FindLasFiles(string directory, bool recursive = true)
     {
@@ -114,6 +113,9 @@ public class LasFileParser
                        .Distinct(StringComparer.OrdinalIgnoreCase);
     }
 
+    /// <summary>
+    /// Обрабатывает информацию о скважине из собранного словаря
+    /// </summary>
     private void ProcessWellInfo(Dictionary<string, (string Value, string Unit)> wellInfoDict, WellInfo wellInfo)
     {
         if (wellInfoDict.TryGetValue(WellFields.Start, out var strt))
@@ -130,6 +132,9 @@ public class LasFileParser
         }
     }
 
+    /// <summary>
+    /// Парсит строковое значение в число с плавающей точкой
+    /// </summary>
     private double? ParseDouble(string value)
     {        
         if (string.IsNullOrWhiteSpace(value))
@@ -148,7 +153,9 @@ public class LasFileParser
         return null;
     }
 
-
+    /// <summary>
+    /// Определяет тип секции по заголовку
+    /// </summary>
     private string GetSectionType(string sectionHeader)
     {
         var header = sectionHeader.ToUpperInvariant();
@@ -169,10 +176,13 @@ public class LasFileParser
         return LasSections.Unknown;
     }
 
+    /// <summary>
+    /// Парсит строку секции Well (формат: МНЕМОНИКА.ЕДИНИЦЫ ЗНАЧЕНИЕ:ОПИСАНИЕ)
+    /// </summary>
     private void ParseWellInfoLine(string line, Dictionary<string, (string Value, string Unit)> dict)
     {
-        // LAS format: MNEMONIC.UNIT VALUE:DESCRIPTION
-        // Example: STRT.M 1500.0000 : START DEPTH
+        // Формат LAS: МНЕМОНИКА.ЕДИНИЦЫ ЗНАЧЕНИЕ:ОПИСАНИЕ
+        // Пример: STRT.M 1500.0000 : START DEPTH
         var colonIndex = line.IndexOf(':');
         if (colonIndex <= 0) return;
 
@@ -184,12 +194,12 @@ public class LasFileParser
             var mnemonic = beforeColon.Substring(0, dotIndex).Trim();
             var afterDot = beforeColon.Substring(dotIndex + 1).Trim();
             
-            // Split afterDot into unit and value
+            // Разделяем afterDot на единицы и значение
             var parts = afterDot.Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
             var unit = parts.Length > 0 ? parts[0] : string.Empty;
             var value = parts.Length > 1 ? string.Join(" ", parts.Skip(1)) : (parts.Length > 0 ? parts[0] : string.Empty);
             
-            // If unit looks like a number, it's actually the value
+            // Если единица выглядит как число, это на самом деле значение
             if (double.TryParse(unit.Replace(',', '.'), System.Globalization.NumberStyles.Any, 
                 System.Globalization.CultureInfo.InvariantCulture, out _))
             {
@@ -211,9 +221,12 @@ public class LasFileParser
         }
     }
 
+    /// <summary>
+    /// Парсит строку описания кривой (формат: МНЕМОНИКА.ЕДИНИЦЫ ДАННЫЕ:ОПИСАНИЕ)
+    /// </summary>
     private CurveDefinition? ParseCurveLine(string line)
     {
-        // LAS format: MNEMONIC.UNIT DATA:DESCRIPTION
+        // Формат LAS: МНЕМОНИКА.ЕДИНИЦЫ ДАННЫЕ:ОПИСАНИЕ
         var colonIndex = line.IndexOf(':');
         if (colonIndex > 0)
         {

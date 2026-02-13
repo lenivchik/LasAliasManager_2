@@ -3,50 +3,50 @@
 namespace LasAliasManager.Core.Services;
 
 /// <summary>
-/// Определение кодировки
+/// Определение кодировки и чтение файлов
 /// </summary>
 public static class FileEncoder
 {
     /// <summary>
-    /// Known Windows codepage for Cyrillic (Windows-1251)
+    /// Кодовая страница кириллицы (Windows-1251)
     /// </summary>
     public const int CyrillicCodePage = 1251;
 
     /// <summary>
-    /// Reads all lines from a file with automatic encoding detection.
-    /// Tries: Ude charset detection → UTF-8 with BOM → UTF-8 → Latin1 fallback
+    /// Читает все строки файла с автоматическим определением кодировки.
+    /// Последовательность: определение через Ude → UTF-8 с BOM → UTF-8 → Latin1 (резервный вариант)
     /// </summary>
-    /// <param name="filePath">Path to the file</param>
-    /// <returns>List of lines with line endings normalized</returns>
+    /// <param name="filePath">Путь к файлу</param>
+    /// <returns>Список строк с нормализованными переносами</returns>
     public static List<string> ReadFileLines(string filePath)
     {
         var bytes = File.ReadAllBytes(filePath);
 
-        // Strategy 1: Try Ude charset detection
+        // Стратегия 1: Определение кодировки через Ude
         var udeResult = TryReadWithUdeDetection(filePath);
         if (udeResult != null)
             return udeResult;
 
-        // Strategy 2: Check for UTF-8 BOM
+        // Стратегия 2: Проверка UTF-8 BOM
         var bomResult = TryReadWithUtf8Bom(bytes);
         if (bomResult != null)
             return bomResult;
 
-        // Strategy 3: Try strict UTF-8
+        // Стратегия 3: Строгая проверка UTF-8
         var utf8Result = TryReadAsUtf8(bytes);
         if (utf8Result != null)
             return utf8Result;
 
-        // Strategy 4: Fallback to Latin1 (never fails)
+        // Стратегия 4: Резервный вариант — Latin1 (никогда не даёт ошибку)
         return ReadAsLatin1(bytes);
     }
 
     /// <summary>
-    /// Reads all lines from a file using ANSI encoding (Windows-1251 for Cyrillic).
-    /// Use this for legacy files that are known to be in ANSI format.
+    /// Читает все строки файла в кодировке ANSI (Windows-1251 для кириллицы).
+    /// Используется для устаревших файлов в формате ANSI.
     /// </summary>
-    /// <param name="filePath">Path to the file</param>
-    /// <returns>List of lines with line endings normalized</returns>
+    /// <param name="filePath">Путь к файлу</param>
+    /// <returns>Список строк с нормализованными переносами</returns>
     public static List<string> ReadFileLinesAnsi(string filePath)
     {
         var encoding = Encoding.GetEncoding(CyrillicCodePage);
@@ -55,11 +55,11 @@ public static class FileEncoder
     }
 
     /// <summary>
-    /// Reads all lines from a file using a specific encoding.
+    /// Читает все строки файла в указанной кодировке
     /// </summary>
-    /// <param name="filePath">Path to the file</param>
-    /// <param name="encoding">Encoding to use</param>
-    /// <returns>List of lines with line endings normalized</returns>
+    /// <param name="filePath">Путь к файлу</param>
+    /// <param name="encoding">Кодировка для чтения</param>
+    /// <returns>Список строк с нормализованными переносами</returns>
     public static List<string> ReadFileLines(string filePath, Encoding encoding)
     {
         var text = File.ReadAllText(filePath, encoding);
@@ -67,10 +67,10 @@ public static class FileEncoder
     }
 
     /// <summary>
-    /// Detects the encoding of a file using Ude library.
+    /// Определяет кодировку файла с помощью библиотеки Ude
     /// </summary>
-    /// <param name="filePath">Path to the file</param>
-    /// <returns>Detected encoding or null if detection failed</returns>
+    /// <param name="filePath">Путь к файлу</param>
+    /// <returns>Определённая кодировка или null, если определение не удалось</returns>
     public static Encoding? DetectEncoding(string filePath)
     {
         try
@@ -87,14 +87,17 @@ public static class FileEncoder
         }
         catch
         {
-            // Encoding detection failed, return null
+            // Определение кодировки не удалось, возвращаем null
         }
 
         return null;
     }
 
-    #region Private Helper Methods
+    #region Вспомогательные методы
 
+    /// <summary>
+    /// Попытка чтения через определение кодировки Ude
+    /// </summary>
     private static List<string>? TryReadWithUdeDetection(string filePath)
     {
         try
@@ -113,12 +116,15 @@ public static class FileEncoder
         }
         catch
         {
-            // Ude detection failed, try next strategy
+            // Определение через Ude не удалось, пробуем следующую стратегию
         }
 
         return null;
     }
 
+    /// <summary>
+    /// Попытка чтения с UTF-8 BOM
+    /// </summary>
     private static List<string>? TryReadWithUtf8Bom(byte[] bytes)
     {
         // UTF-8 BOM: EF BB BF
@@ -131,28 +137,37 @@ public static class FileEncoder
         return null;
     }
 
+    /// <summary>
+    /// Попытка чтения как строгий UTF-8
+    /// </summary>
     private static List<string>? TryReadAsUtf8(byte[] bytes)
     {
         try
         {
-            // Use strict UTF-8 that throws on invalid sequences
+            // Строгий UTF-8, вызывающий исключение при невалидных последовательностях
             var utf8Strict = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true);
             var text = utf8Strict.GetString(bytes);
             return SplitIntoLines(text);
         }
         catch
         {
-            // Not valid UTF-8
+            // Не валидный UTF-8
             return null;
         }
     }
 
+    /// <summary>
+    /// Чтение как Latin1 (резервный вариант, никогда не даёт ошибку)
+    /// </summary>
     private static List<string> ReadAsLatin1(byte[] bytes)
     {
         var text = Encoding.Latin1.GetString(bytes);
         return SplitIntoLines(text);
     }
 
+    /// <summary>
+    /// Разбивает текст на строки с нормализацией переносов
+    /// </summary>
     private static List<string> SplitIntoLines(string text)
     {
         return text

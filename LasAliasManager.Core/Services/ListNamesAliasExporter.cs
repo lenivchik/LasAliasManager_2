@@ -9,12 +9,12 @@ namespace LasAliasManager.Core.Services;
 public class ListNamesAliasExporter
 {
     /// <summary>
-    /// Exports the database to ListNamesAlias.txt format
-    /// Sorted by PrimaryName, then by FieldName within each primary name
+    /// Экспортирует базу данных в формат ListNamesAlias.txt
+    /// Сортировка по базовому имени, затем по полевому имени внутри каждой группы
     /// </summary>
-    /// <param name="filePath">Output file path</param>
-    /// <param name="aliases">Dictionary of base names to their field names</param>
-    /// <param name="ignoredNames">Set of ignored names (will use "No" as primary name)</param>
+    /// <param name="filePath">Путь к выходному файлу</param>
+    /// <param name="aliases">Словарь базовых имен с их полевыми именами</param>
+    /// <param name="ignoredNames">Набор игнорируемых имен (будет использовано "No" как базовое имя)</param>
     public void Export(string filePath, Dictionary<string, List<string>> aliases, HashSet<string> ignoredNames)
     {
         var entries = new List<(string PrimaryName, string FieldName)>();
@@ -57,18 +57,18 @@ public class ListNamesAliasExporter
     }
 
     /// <summary>
-    /// Appends new entries to an existing ListNamesAlias.txt file
-    /// Re-sorts the entire file after adding
+    /// Дополняет существующий файл ListNamesAlias.txt новыми записями
+    /// После добавления пересортировывает весь файл
     /// </summary>
-    /// <param name="filePath">Path to existing file</param>
-    /// <param name="newAliases">New aliases to add</param>
-    /// <param name="newIgnored">New ignored names to add</param>
+    /// <param name="filePath">Путь к существующему файлу</param>
+    /// <param name="newAliases">Новые псевдонимы для добавления</param>
+    /// <param name="newIgnored">Новые игнорируемые имена для добавления</param>
     public void AppendAndSort(string filePath, Dictionary<string, List<string>> newAliases, HashSet<string> newIgnored)
     {
-        // Load existing entries
+        // Загружаем существующие записи
         var existingEntries = LoadExistingEntries(filePath);
 
-        // Add new aliases
+        // Добавляем новые псевдонимы
         foreach (var kvp in newAliases)
         {
             var primaryName = kvp.Key;
@@ -82,7 +82,7 @@ public class ListNamesAliasExporter
             }
         }
 
-        // Add new ignored names
+        // Добавляем новые игнорируемые имена
         foreach (var ignored in newIgnored)
         {
             var entry = (PrimaryNames.Ignored, ignored);
@@ -92,7 +92,7 @@ public class ListNamesAliasExporter
             }
         }
 
-        // Sort and write
+        // Сортируем и записываем
         var sorted = existingEntries
             .OrderBy(e => e.PrimaryName, StringComparer.OrdinalIgnoreCase)
             .ThenBy(e => e.FieldName, StringComparer.OrdinalIgnoreCase)
@@ -112,7 +112,7 @@ public class ListNamesAliasExporter
     }
 
     /// <summary>
-    /// Loads existing entries from a ListNamesAlias.txt file
+    /// Загружает существующие записи из файла ListNamesAlias.txt
     /// </summary>
     private HashSet<(string PrimaryName, string FieldName)> LoadExistingEntries(string filePath)
     {
@@ -131,7 +131,7 @@ public class ListNamesAliasExporter
             if (string.IsNullOrWhiteSpace(trimmed))
                 continue;
 
-            // Skip header and footer
+            // Пропускаем заголовок и подвал
             if (trimmed.StartsWith("===") || trimmed.StartsWith("***"))
             {
                 headerPassed = true;
@@ -144,20 +144,20 @@ public class ListNamesAliasExporter
             if (!headerPassed)
                 continue;
 
-            // Parse entry: PrimaryName FieldName [optional :formula]
+            // Парсим запись: БазовоеИмя ПолевоеИмя [необязательно :формула]
             var parts = trimmed.Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
             if (parts.Length >= 2)
             {
                 var primaryName = parts[0];
 
-                // Field name is everything after primary name, but before ":" if present
+                // Полевое имя — всё после базового имени, но до "." если присутствует
                 var restOfLine = trimmed.Substring(primaryName.Length).Trim();
                 var colonIndex = restOfLine.IndexOf('.');
                 var fieldName = colonIndex > 0
                     ? restOfLine.Substring(0, colonIndex).Trim()
                     : restOfLine.Trim();
 
-                // Clean up field name (remove trailing dots and spaces)
+                // Очищаем полевое имя от завершающих точек и пробелов
                 fieldName = fieldName.TrimEnd('.', ' ');
 
                 if (!string.IsNullOrWhiteSpace(fieldName))

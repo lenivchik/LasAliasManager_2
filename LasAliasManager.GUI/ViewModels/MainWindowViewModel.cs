@@ -13,7 +13,7 @@ using static LasAliasManager.Core.Constants;
 namespace LasAliasManager.GUI.ViewModels;
 
 /// <summary>
-/// Types of messages for user notifications
+/// Типы сообщений для уведомлений пользователя
 /// </summary>
 public enum MessageType
 {
@@ -26,45 +26,45 @@ public enum MessageType
 public partial class MainWindowViewModel : ObservableObject
 {
     /// <summary>
-    /// Represents a single curve change for undo purposes
+    /// Представляет одно изменение кривой для системы отмены
     /// </summary>
     private record UndoEntry(CurveRowViewModel Curve, string? PreviousPrimaryName);
 
     private readonly AliasManager _aliasManager;
 
     /// <summary>
-    /// Tracks mappings defined by the user during this session (FieldName -> PrimaryName)
+    /// Отслеживает сопоставления, определённые пользователем в текущей сессии (ПолевоеИмя -> БазовоеИмя)
     /// </summary>
     private readonly Dictionary<string, string> _userDefinedMappings = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
-    /// Tracks names the user marked as ignored during this session
+    /// Отслеживает имена, отмеченные пользователем как игнорируемые в текущей сессии
     /// </summary>
     private readonly HashSet<string> _userDefinedIgnored = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
-    /// Undo stack — each entry is a group of changes (single change or batch from Apply to All)
+    /// Стек отмены — каждый элемент содержит группу изменений (одиночное или пакетное из «Применить ко всем»)
     /// </summary>
     private readonly Stack<List<UndoEntry>> _undoStack = new();
 
     /// <summary>
-    /// Flag to suppress undo recording during undo/batch/load operations
+    /// Флаг для подавления записи отмены при операциях отмены/пакетных/загрузки
     /// </summary>
     private bool _suppressUndoRecording;
 
     /// <summary>
-    /// Accumulator for batch undo entries (used during Apply to All)
+    /// Накопитель записей пакетной отмены (используется при «Применить ко всем»)
     /// </summary>
     private List<UndoEntry>? _batchUndoEntries;
 
     /// <summary>
-    /// Action to show message dialog (set by View)
+    /// Действие для показа диалога сообщения (устанавливается представлением)
     /// </summary>
     public Action<string, string, MessageType>? ShowMessageDialog { get; set; }
 
     /// <summary>
-    /// Default export file path passed from command-line (second argument).
-    /// Used as suggested path in the export file picker dialog.
+    /// Путь экспорта по умолчанию, переданный из командной строки (второй аргумент).
+    /// Используется как предложенный путь в диалоге выбора файла экспорта.
     /// </summary>
     [ObservableProperty]
     private string? _defaultExportPath;
@@ -129,7 +129,7 @@ public partial class MainWindowViewModel : ObservableObject
     private bool _suppressStatusUpdates;
 
     /// <summary>
-    /// Whether there are curves selected for export that haven't been exported
+    /// Есть ли кривые, выбранные для экспорта, но ещё не экспортированные
     /// </summary>
     public bool HasUnexportedSelectedCurves
     {
@@ -142,24 +142,27 @@ public partial class MainWindowViewModel : ObservableObject
     }
 
     /// <summary>
-    /// Number of user-defined mappings available for export
+    /// Количество пользовательских сопоставлений, доступных для экспорта
     /// </summary>
     public int UserDefinedCount => _userDefinedMappings.Count + _userDefinedIgnored.Count;
 
     /// <summary>
-    /// Number of curves that have been exported
+    /// Количество экспортированных кривых
     /// </summary>
     public int ExportedCount => LasFiles.SelectMany(f => f.Curves).Count(c => c.IsExported);
 
+    /// <summary>
+    /// Загружена ли база данных
+    /// </summary>
     public bool HasDatabase => !string.IsNullOrEmpty(_aliasManager.DatabaseFilePath);
 
     /// <summary>
-    /// Whether there are changes that can be undone
+    /// Есть ли изменения, которые можно отменить
     /// </summary>
     public bool CanUndo => _undoStack.Count > 0;
 
     /// <summary>
-    /// Description of the undo action count for button tooltip
+    /// Описание действия отмены для подсказки кнопки
     /// </summary>
     public string UndoDescription => _undoStack.Count > 0
         ? $"Отменить ({_undoStack.Count})"
@@ -208,6 +211,9 @@ public partial class MainWindowViewModel : ObservableObject
         ApplyCurveFilter();
     }
 
+    /// <summary>
+    /// Загружает базу данных из CSV файла
+    /// </summary>
     [RelayCommand]
     private async Task LoadCsvDatabaseAsync(string? csvPath)
     {
@@ -224,7 +230,7 @@ public partial class MainWindowViewModel : ObservableObject
                 _aliasManager.LoadFromCsv(csvPath);
             });
 
-            // Clear stale session tracking from previous database
+            // Очищаем устаревшие данные сессии от предыдущей базы данных
             _userDefinedMappings.Clear();
             _userDefinedIgnored.Clear();
             OnPropertyChanged(nameof(UserDefinedCount));
@@ -235,7 +241,7 @@ public partial class MainWindowViewModel : ObservableObject
             var stats = _aliasManager.Database.GetStatistics();
             StatusMessage = $"База данных загружена: {stats.BaseCount} Основных имен, {stats.TotalAliases} Полевых имен, {stats.IgnoredCount} Игнорируются";
 
-            // Re-analyze already loaded files if any
+            // Пере-анализируем уже загруженные файлы, если есть
             if (!string.IsNullOrEmpty(CurrentFolderPath))
             {
                 await ReanalyzeLoadedFilesAsync();
@@ -251,6 +257,9 @@ public partial class MainWindowViewModel : ObservableObject
         }
     }
 
+    /// <summary>
+    /// Пере-анализирует уже загруженные файлы после смены базы данных
+    /// </summary>
     private async Task ReanalyzeLoadedFilesAsync()
     {
         StatusMessage = "Анализ файлов...";
@@ -266,7 +275,7 @@ public partial class MainWindowViewModel : ObservableObject
                     if (result.HasError)
                         continue;
 
-                    // Update each curve's status
+                    // Обновляем статус каждой кривой
                     foreach (var curve in fileVm.Curves)
                     {
                         var fieldName = curve.CurveFieldName;
@@ -303,16 +312,16 @@ public partial class MainWindowViewModel : ObservableObject
                 }
             });
 
-            // Update totals
+            // Обновляем итоги
             TotalCurves = LasFiles.Sum(f => f.CurveCount);
             UnknownCurves = LasFiles.Sum(f => f.UnknownCount);
 
-            // Refresh current view
+            // Обновляем текущее представление
             ApplyFileFilter();
             ApplyCurveFilter();
             UpdateHasUnsavedChanges();
 
-            StatusMessage = $"Пере-анализировано {LasFiles.Count} файлов, сопоставлено {TotalCurves} кривых ({UnknownCurves} неизвестных )";
+            StatusMessage = $"Пере-анализировано {LasFiles.Count} файлов, сопоставлено {TotalCurves} кривых ({UnknownCurves} неизвестных)";
         }
         finally
         {
@@ -324,6 +333,9 @@ public partial class MainWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(UndoDescription));
     }
 
+    /// <summary>
+    /// Обновляет список доступных базовых имен из базы данных
+    /// </summary>
     private void RefreshAvailablePrimaryNames()
     {
         AvailablePrimaryNames.Clear();
@@ -337,6 +349,9 @@ public partial class MainWindowViewModel : ObservableObject
         }
     }
 
+    /// <summary>
+    /// Загружает и анализирует LAS файлы из указанной папки
+    /// </summary>
     [RelayCommand]
     private async Task LoadFolderAsync(string? folderPath)
     {
@@ -353,6 +368,8 @@ public partial class MainWindowViewModel : ObservableObject
 
             var results = await Task.Run(() =>
                 _aliasManager.AnalyzeDirectory(folderPath, IncludeSubfolders));
+
+            // Очищаем обратные вызовы предыдущих файлов
             foreach (var file in LasFiles)
             {
                 CleanupFileCallbacks(file);
@@ -377,7 +394,7 @@ public partial class MainWindowViewModel : ObservableObject
                     CurveCount = result.TotalCurves
                 };
 
-                // Add mapped curves
+                // Добавляем сопоставленные кривые
                 foreach (var mapped in result.MappedCurves)
                 {
                     foreach (var fieldName in mapped.Value)
@@ -397,7 +414,7 @@ public partial class MainWindowViewModel : ObservableObject
                     }
                 }
 
-                // Add ignored curves
+                // Добавляем игнорируемые кривые
                 foreach (var ignored in result.IgnoredCurves)
                 {
                     var row = CreateCurveRow(ignored, fileVm);
@@ -414,7 +431,7 @@ public partial class MainWindowViewModel : ObservableObject
                     fileVm.Curves.Add(row);
                 }
 
-                // Add unknown curves
+                // Добавляем неизвестные кривые
                 foreach (var unknown in result.UnknownCurves)
                 {
                     var row = CreateCurveRow(unknown, fileVm);
@@ -442,7 +459,7 @@ public partial class MainWindowViewModel : ObservableObject
             TotalCurves = totalCurvesCount;
             UnknownCurves = totalUnknown;
 
-            // Select first file if available
+            // Выбираем первый файл, если доступен
             ApplyFileFilter();
             if (FilteredFiles.Count > 0)
             {
@@ -454,7 +471,7 @@ public partial class MainWindowViewModel : ObservableObject
         }
         catch (Exception ex)
         {
-            StatusMessage = $"Error loading folder: {ex.Message}";
+            StatusMessage = $"Ошибка загрузки папки: {ex.Message}";
         }
         finally
         {
@@ -466,6 +483,9 @@ public partial class MainWindowViewModel : ObservableObject
         }
     }
 
+    /// <summary>
+    /// Создаёт строку кривой с привязкой обратных вызовов
+    /// </summary>
     private CurveRowViewModel CreateCurveRow(string curveName, LasFileViewModel parentFile)
     {
         var row = new CurveRowViewModel
@@ -474,16 +494,16 @@ public partial class MainWindowViewModel : ObservableObject
             CurveFieldName = curveName
         };
 
-        // Initialize filtered list
+        // Инициализируем отфильтрованный список
         row.RefreshFilteredPrimaryNames();
 
-        // Wire up undo recording
+        // Подключаем запись отмены
         row.OnBeforePrimaryNameChanged = RecordUndoChange;
 
-        // Wire up modification callback
+        // Подключаем обратный вызов модификации
         row.OnModificationChanged = () =>
         {
-            if (_suppressStatusUpdates) return;  // skip during batch
+            if (_suppressStatusUpdates) return;  // пропускаем при пакетной обработке
 
             Avalonia.Threading.Dispatcher.UIThread.Post(() =>
             {
@@ -492,7 +512,7 @@ public partial class MainWindowViewModel : ObservableObject
                 UnknownCurves = LasFiles.Sum(f => f.UnknownCount);
             }, Avalonia.Threading.DispatcherPriority.Background);
 
-            // Wire up selection for export callback
+            // Подключаем обратный вызов выбора для экспорта
             row.OnSelectionForExportChanged = () =>
         {
             UpdateSelectedForExportCount();
@@ -502,11 +522,17 @@ public partial class MainWindowViewModel : ObservableObject
         return row;
     }
 
+    /// <summary>
+    /// Обновляет количество выбранных для экспорта кривых
+    /// </summary>
     private void UpdateSelectedForExportCount()
     {
         SelectedForExportCount = LasFiles.Sum(f => f.Curves.Count(c => c.IsSelectedForExport));
     }
 
+    /// <summary>
+    /// Применяет фильтр к списку файлов
+    /// </summary>
     private void ApplyFileFilter()
     {
         var filtered = LasFiles.AsEnumerable();
@@ -532,6 +558,9 @@ public partial class MainWindowViewModel : ObservableObject
         }
     }
 
+    /// <summary>
+    /// Применяет фильтр к списку кривых выбранного файла
+    /// </summary>
     private void ApplyCurveFilter()
     {
         if (SelectedFile == null)
@@ -557,21 +586,21 @@ public partial class MainWindowViewModel : ObservableObject
 
         var desiredItems = filtered.ToList();
 
-        // In-place sync: remove items not in desired set, add missing ones
+        // Синхронизация «на месте»: удаляем лишние элементы, добавляем недостающие
         UpdateCollectionInPlace(FilteredCurves, desiredItems);
 
         UpdateHasUnsavedChanges();
     }
 
     /// <summary>
-    /// Synchronizes an ObservableCollection to match a target list
-    /// without recreating it, preserving DataGrid scroll position.
+    /// Синхронизирует ObservableCollection с целевым списком
+    /// без пересоздания, сохраняя позицию прокрутки DataGrid.
     /// </summary>
     private static void UpdateCollectionInPlace<T>(
         ObservableCollection<T> collection,
         List<T> desired)
     {
-        // Remove items not in desired set
+        // Удаляем элементы, отсутствующие в целевом наборе
         var desiredSet = new HashSet<T>(desired);
         for (int i = collection.Count - 1; i >= 0; i--)
         {
@@ -581,7 +610,7 @@ public partial class MainWindowViewModel : ObservableObject
             }
         }
 
-        // Add/reorder to match desired
+        // Добавляем/переупорядочиваем для соответствия целевому списку
         var existingSet = new HashSet<T>(collection);
         int insertIndex = 0;
         foreach (var item in desired)
@@ -589,12 +618,12 @@ public partial class MainWindowViewModel : ObservableObject
             if (insertIndex < collection.Count &&
                 EqualityComparer<T>.Default.Equals(collection[insertIndex], item))
             {
-                // Already in correct position
+                // Уже на правильной позиции
                 insertIndex++;
             }
             else if (existingSet.Contains(item))
             {
-                // Item exists but in wrong position — move it
+                // Элемент существует, но на неправильной позиции — перемещаем
                 var currentIndex = collection.IndexOf(item);
                 if (currentIndex != insertIndex)
                 {
@@ -604,7 +633,7 @@ public partial class MainWindowViewModel : ObservableObject
             }
             else
             {
-                // New item — insert at correct position
+                // Новый элемент — вставляем на правильную позицию
                 collection.Insert(insertIndex, item);
                 existingSet.Add(item);
                 insertIndex++;
@@ -612,12 +641,15 @@ public partial class MainWindowViewModel : ObservableObject
         }
     }
 
+    /// <summary>
+    /// Сохраняет все изменения в базу данных
+    /// </summary>
     [RelayCommand]
     private async Task SaveChangesAsync()
     {
         if ((!HasDatabase))
         {
-            StatusMessage = "Error: No database loaded";
+            StatusMessage = "Ошибка: база данных не загружена";
             return;
         }
 
@@ -629,16 +661,16 @@ public partial class MainWindowViewModel : ObservableObject
             var modifiedCurves = new List<CurveRowViewModel>();
             var newBaseNames = new List<string>();
 
-            // Collect all modified curves from all files
+            // Собираем все изменённые кривые из всех файлов
             foreach (var file in LasFiles)
             {
                 modifiedCurves.AddRange(file.Curves.Where(c => c.IsModified));
             }
 
-            // Build a dictionary of new mappings for quick lookup
+            // Словарь новых сопоставлений для быстрого поиска
             var newMappings = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             var newIgnored = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            // Get current base names for checking if entered name is new
+            // Получаем текущие базовые имена для проверки, является ли введённое имя новым
             var existingBaseNames = new HashSet<string>(_aliasManager.Database.GetAllBaseNames(), StringComparer.OrdinalIgnoreCase);
             foreach (var curve in modifiedCurves)
             {
@@ -647,7 +679,7 @@ public partial class MainWindowViewModel : ObservableObject
                     _aliasManager.AddAsIgnored(curve.CurveFieldName);
                     newIgnored.Add(curve.CurveFieldName);
 
-                    // Track for export
+                    // Отслеживаем для экспорта
                     _userDefinedIgnored.Add(curve.CurveFieldName);
                     _userDefinedMappings.Remove(curve.CurveFieldName);
                 }
@@ -658,7 +690,7 @@ public partial class MainWindowViewModel : ObservableObject
                     newMappings[curve.CurveFieldName] = curve.CurveFieldName;
                     existingBaseNames.Add(curve.CurveFieldName);
 
-                    // Track for export
+                    // Отслеживаем для экспорта
                     _userDefinedMappings[curve.CurveFieldName] = curve.CurveFieldName;
                     _userDefinedIgnored.Remove(curve.CurveFieldName);
                 }
@@ -666,28 +698,28 @@ public partial class MainWindowViewModel : ObservableObject
                 {
                     var enteredName = curve.PrimaryName.Trim();
 
-                    // Check if the entered name is a new base name (not in existing list)
+                    // Проверяем, является ли введённое имя новым базовым (отсутствует в существующем списке)
                     if (!existingBaseNames.Contains(enteredName) &&
                         enteredName != Markers.Ignore &&
                         enteredName != Markers.NewBase)
                     {
-                        // Create new base name with the user-entered name
+                        // Создаём новое базовое имя с введённым пользователем именем
                         _aliasManager.Database.AddBaseName(enteredName, new[] { curve.CurveFieldName });
                         newBaseNames.Add(enteredName);
                         newMappings[curve.CurveFieldName] = enteredName;
                         existingBaseNames.Add(enteredName);
 
-                        // Track for export
+                        // Отслеживаем для экспорта
                         _userDefinedMappings[curve.CurveFieldName] = enteredName;
                         _userDefinedIgnored.Remove(curve.CurveFieldName);
                     }
                     else
                     {
-                        // Add as alias to existing base name
+                        // Добавляем как полевое имя к существующему базовому
                         _aliasManager.AddAsAlias(curve.CurveFieldName, enteredName);
                         newMappings[curve.CurveFieldName] = enteredName;
 
-                        // Track for export
+                        // Отслеживаем для экспорта
                         _userDefinedMappings[curve.CurveFieldName] = enteredName;
                         _userDefinedIgnored.Remove(curve.CurveFieldName);
                     }
@@ -699,7 +731,7 @@ public partial class MainWindowViewModel : ObservableObject
                 _aliasManager.SaveToCsv();
             });
 
-            // Add new base names to available list
+            // Добавляем новые базовые имена в список доступных
             foreach (var newBase in newBaseNames)
             {
                 if (!AvailablePrimaryNames.Contains(newBase))
@@ -708,7 +740,7 @@ public partial class MainWindowViewModel : ObservableObject
                 }
             }
 
-            // Update ALL curves across ALL files that match the new mappings
+            // Обновляем ВСЕ кривые во ВСЕХ файлах, соответствующие новым сопоставлениям
             _suppressUndoRecording = true;
             try
             {
@@ -718,7 +750,7 @@ public partial class MainWindowViewModel : ObservableObject
                     {
                         var fieldName = curve.CurveFieldName;
 
-                        // Check if this curve was just mapped
+                        // Проверяем, была ли кривая только что сопоставлена
                         if (newMappings.TryGetValue(fieldName, out var primaryName))
                         {
                             curve.OriginalPrimaryName = primaryName;
@@ -737,7 +769,7 @@ public partial class MainWindowViewModel : ObservableObject
                         }
                         else if (curve.IsModified)
                         {
-                            // This was a modified curve that we already processed
+                            // Это изменённая кривая, которую мы уже обработали
                             curve.OriginalPrimaryName = curve.PrimaryName;
                             curve.IsModified = false;
                             curve.IsUnknown = string.IsNullOrEmpty(curve.PrimaryName);
@@ -753,12 +785,12 @@ public partial class MainWindowViewModel : ObservableObject
                 _suppressUndoRecording = false;
             }
 
-            // Clear undo stack — original state has changed
+            // Очищаем стек отмены — исходное состояние изменилось
             _undoStack.Clear();
             OnPropertyChanged(nameof(CanUndo));
             OnPropertyChanged(nameof(UndoDescription));
 
-            // Update totals
+            // Обновляем итоги
             UnknownCurves = LasFiles.Sum(f => f.UnknownCount);
 
             HasUnsavedChanges = false;
@@ -768,7 +800,7 @@ public partial class MainWindowViewModel : ObservableObject
         }
         catch (Exception ex)
         {
-            StatusMessage = $"Error saving: {ex.Message}";
+            StatusMessage = $"Ошибка сохранения: {ex.Message}";
         }
         finally
         {
@@ -776,6 +808,9 @@ public partial class MainWindowViewModel : ObservableObject
         }
     }
 
+    /// <summary>
+    /// Обновляет представление
+    /// </summary>
     [RelayCommand]
     private void RefreshView()
     {
@@ -788,7 +823,7 @@ public partial class MainWindowViewModel : ObservableObject
     }
 
     /// <summary>
-    /// Records a single curve change for undo. Called by CurveRowViewModel before PrimaryName changes.
+    /// Записывает одно изменение кривой для отмены. Вызывается из CurveRowViewModel перед изменением PrimaryName.
     /// </summary>
     private void RecordUndoChange(CurveRowViewModel curve, string? oldValue)
     {
@@ -798,12 +833,12 @@ public partial class MainWindowViewModel : ObservableObject
 
         if (_batchUndoEntries != null)
         {
-            // We're in a batch operation (Apply to All) — accumulate
+            // Мы в пакетной операции («Применить ко всем») — накапливаем
             _batchUndoEntries.Add(entry);
         }
         else
         {
-            // Single change — push as its own group
+            // Одиночное изменение — помещаем как отдельную группу
             _undoStack.Push(new List<UndoEntry> { entry });
             OnPropertyChanged(nameof(CanUndo));
             OnPropertyChanged(nameof(UndoDescription));
@@ -811,7 +846,7 @@ public partial class MainWindowViewModel : ObservableObject
     }
 
     /// <summary>
-    /// Undo the last change (single step back)
+    /// Отменяет последнее изменение (один шаг назад)
     /// </summary>
     [RelayCommand]
     private void UndoLastChange()
@@ -833,7 +868,7 @@ public partial class MainWindowViewModel : ObservableObject
             _suppressUndoRecording = false;
         }
 
-        // Refresh UI
+        // Обновляем интерфейс
         foreach (var file in LasFiles)
         {
             file.RefreshStatus();
@@ -852,7 +887,7 @@ public partial class MainWindowViewModel : ObservableObject
     }
 
     /// <summary>
-    /// Apply all assigned PrimaryNames from the current file's curves to matching curves across all other files
+    /// Применяет все назначенные базовые имена из кривых текущего файла к совпадающим кривым во всех остальных файлах
     /// </summary>
     [RelayCommand]
     private void ApplyToAll()
@@ -882,7 +917,7 @@ public partial class MainWindowViewModel : ObservableObject
             .SelectMany(f => f.Curves)
             .Where(c => sourceMappings.TryGetValue(c.CurveFieldName, out var targetName)
                         && c.PrimaryName != targetName)
-            .ToList();  // materialize before modifying
+            .ToList();  // материализуем перед изменением
 
         if (curvesToUpdate.Count == 0)
         {
@@ -890,10 +925,10 @@ public partial class MainWindowViewModel : ObservableObject
             return;
         }
 
-        // Suppress per-curve deferred UI updates during batch
-        _suppressUndoRecording = false; // undo still needed
+        // Подавляем отложенные обновления интерфейса при пакетной обработке
+        _suppressUndoRecording = false; // отмена всё ещё нужна
         _batchUndoEntries = new List<UndoEntry>();
-        _suppressStatusUpdates = true;  // NEW FLAG
+        _suppressStatusUpdates = true;
 
         try
         {
@@ -915,7 +950,7 @@ public partial class MainWindowViewModel : ObservableObject
             _batchUndoEntries = null;
         }
 
-        // One synchronous refresh — no stale counts
+        // Одно синхронное обновление — без устаревших данных
         foreach (var file in LasFiles)
         {
             file.RefreshStatus();
@@ -927,11 +962,18 @@ public partial class MainWindowViewModel : ObservableObject
 
         StatusMessage = $"Применено {curvesToUpdate.Count} изменений из '{SelectedFile.FileName}' к другим файлам";
     }
+
+    /// <summary>
+    /// Обновляет флаг наличия несохранённых изменений
+    /// </summary>
     private void UpdateHasUnsavedChanges()
     {
         HasUnsavedChanges = LasFiles.Any(f => f.Curves.Any(c => c.IsModified));
     }
 
+    /// <summary>
+    /// Сбрасывает все изменения к исходным значениям
+    /// </summary>
     [RelayCommand]
     private void ClearAllChanges()
     {
@@ -952,7 +994,7 @@ public partial class MainWindowViewModel : ObservableObject
             _suppressUndoRecording = false;
         }
 
-        // Clear undo stack since we've reset everything
+        // Очищаем стек отмены, т.к. всё сброшено
         _undoStack.Clear();
         OnPropertyChanged(nameof(CanUndo));
         OnPropertyChanged(nameof(UndoDescription));
@@ -962,15 +1004,21 @@ public partial class MainWindowViewModel : ObservableObject
         ApplyCurveFilter();
     }
 
+    /// <summary>
+    /// Очищает историю экспорта
+    /// </summary>
     [RelayCommand]
     private void ClearExportHistory()
     {
         _userDefinedMappings.Clear();
         _userDefinedIgnored.Clear();
         OnPropertyChanged(nameof(UserDefinedCount));
-        StatusMessage = "Export history cleared";
+        StatusMessage = "История экспорта очищена";
     }
 
+    /// <summary>
+    /// Экспортирует пользовательские сопоставления в файл ListNamesAlias.txt
+    /// </summary>
     [RelayCommand]
     private async Task ExportListNamesAliasAsync(string? filePath)
     {
@@ -979,25 +1027,25 @@ public partial class MainWindowViewModel : ObservableObject
 
         if (_userDefinedMappings.Count == 0 && _userDefinedIgnored.Count == 0)
         {
-            StatusMessage = "No user-defined mappings to export. Save changes first.";
-            ShowMessageDialog?.Invoke("Export", "No user-defined mappings to export.\nSave changes first to track mappings.", MessageType.Warning);
+            StatusMessage = "Нет пользовательских сопоставлений для экспорта. Сначала сохраните изменения.";
+            ShowMessageDialog?.Invoke("Экспорт", "Нет пользовательских сопоставлений для экспорта.\nСначала сохраните изменения для отслеживания сопоставлений.", MessageType.Warning);
             return;
         }
 
         try
         {
             IsLoading = true;
-            StatusMessage = "Exporting to ListNamesAlias.txt...";
+            StatusMessage = "Экспорт в ListNamesAlias.txt...";
 
-            // Keep track of exported field names
+            // Отслеживаем экспортированные полевые имена
             var exportedFieldNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
             await Task.Run(() =>
             {
                 var exporter = new ListNamesAliasExporter();
 
-                // Convert user-defined mappings to the format expected by exporter
-                // Group by PrimaryName
+                // Преобразуем пользовательские сопоставления в формат, ожидаемый экспортёром
+                // Группируем по базовому имени
                 var userAliases = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
 
                 foreach (var kvp in _userDefinedMappings)
@@ -1018,13 +1066,13 @@ public partial class MainWindowViewModel : ObservableObject
                     exportedFieldNames.Add(fieldName);
                 }
 
-                // Add ignored names to exported set
+                // Добавляем игнорируемые имена в набор экспортированных
                 foreach (var name in _userDefinedIgnored)
                 {
                     exportedFieldNames.Add(name);
                 }
 
-                // If file exists, append and sort; otherwise create new
+                // Если файл существует, дополняем и сортируем; иначе создаём новый
                 if (File.Exists(filePath))
                 {
                     exporter.AppendAndSort(filePath, userAliases, _userDefinedIgnored);
@@ -1035,7 +1083,7 @@ public partial class MainWindowViewModel : ObservableObject
                 }
             });
 
-            // Mark exported curves in UI
+            // Отмечаем экспортированные кривые в интерфейсе
             foreach (var file in LasFiles)
             {
                 foreach (var curve in file.Curves)
@@ -1047,17 +1095,17 @@ public partial class MainWindowViewModel : ObservableObject
                 }
             }
 
-            // Update exported count
+            // Обновляем счётчик экспортированных
             OnPropertyChanged(nameof(ExportedCount));
 
             var count = _userDefinedMappings.Count + _userDefinedIgnored.Count;
-            StatusMessage = $"Exported {count} user-defined entries to {Path.GetFileName(filePath)}";
-            ShowMessageDialog?.Invoke("Export Successful", $"Exported {count} user-defined entries to:\n{filePath}", MessageType.Success);
+            StatusMessage = $"Экспортировано {count} пользовательских записей в {Path.GetFileName(filePath)}";
+            ShowMessageDialog?.Invoke("Успешный экспорт", $"Экспортировано {count} пользовательских записей в:\n{filePath}", MessageType.Success);
         }
         catch (Exception ex)
         {
-            StatusMessage = $"Error exporting: {ex.Message}";
-            ShowMessageDialog?.Invoke("Export Error", $"Failed to export:\n{ex.Message}", MessageType.Error);
+            StatusMessage = $"Ошибка экспорта: {ex.Message}";
+            ShowMessageDialog?.Invoke("Ошибка экспорта", $"Не удалось экспортировать:\n{ex.Message}", MessageType.Error);
         }
         finally
         {
@@ -1065,6 +1113,9 @@ public partial class MainWindowViewModel : ObservableObject
         }
     }
 
+    /// <summary>
+    /// Экспортирует выбранные кривые в файл
+    /// </summary>
     [RelayCommand]
     private async Task ExportSelectedCurvesAsync(string? filePath)
     {
@@ -1083,17 +1134,17 @@ public partial class MainWindowViewModel : ObservableObject
 
         if (selectedCurves.Count == 0 && ignoredCurves.Count == 0)
         {
-            StatusMessage = "У выбранных кривых отсутсвуют базовые имена.";
-            ShowMessageDialog?.Invoke("Экспорт", "У выбранных кривых отсутсвуют базовые имена.\n Укажите базовые имена...", MessageType.Warning);
+            StatusMessage = "У выбранных кривых отсутствуют базовые имена.";
+            ShowMessageDialog?.Invoke("Экспорт", "У выбранных кривых отсутствуют базовые имена.\n Укажите базовые имена...", MessageType.Warning);
             return;
         }
 
         try
         {
             IsLoading = true;
-            StatusMessage = "Экпорт выбранных кривых...";
+            StatusMessage = "Экспорт выбранных кривых...";
 
-            // Build lists for display message
+            // Формируем списки для отображения сообщения
             var exportedMappingsList = new List<string>();
             var exportedIgnoredList = new List<string>();
 
@@ -1101,7 +1152,7 @@ public partial class MainWindowViewModel : ObservableObject
             {
                 var exporter = new ListNamesAliasExporter();
 
-                // Group selected curves by PrimaryName
+                // Группируем выбранные кривые по базовому имени
                 var aliases = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
 
                 foreach (var curve in selectedCurves)
@@ -1122,7 +1173,7 @@ public partial class MainWindowViewModel : ObservableObject
                     exportedMappingsList.Add($"{fieldName} → {primaryName}");
                 }
 
-                // Collect ignored curve names
+                // Собираем имена игнорируемых кривых
                 var ignored = new HashSet<string>(
                     ignoredCurves.Select(c => c.CurveFieldName),
                     StringComparer.OrdinalIgnoreCase);
@@ -1132,7 +1183,7 @@ public partial class MainWindowViewModel : ObservableObject
                     exportedIgnoredList.Add(curve.CurveFieldName);
                 }
 
-                // If file exists, append and sort; otherwise create new
+                // Если файл существует, дополняем и сортируем; иначе создаём новый
                 if (File.Exists(filePath))
                 {
                     exporter.AppendAndSort(filePath, aliases, ignored);
@@ -1143,7 +1194,7 @@ public partial class MainWindowViewModel : ObservableObject
                 }
             });
 
-            // Mark all selected curves as exported
+            // Отмечаем все выбранные кривые как экспортированные
             foreach (var curve in selectedCurves)
             {
                 curve.IsExported = true;
@@ -1153,10 +1204,10 @@ public partial class MainWindowViewModel : ObservableObject
                 curve.IsExported = true;
             }
 
-            // Update exported count
+            // Обновляем счётчик экспортированных
             OnPropertyChanged(nameof(ExportedCount));
 
-            // Build detailed message
+            // Формируем подробное сообщение
             var totalCount = selectedCurves.Count + ignoredCurves.Count;
             var messageLines = new List<string>
             {
@@ -1183,8 +1234,8 @@ public partial class MainWindowViewModel : ObservableObject
         }
         catch (Exception ex)
         {
-            StatusMessage = $"Error exporting: {ex.Message}";
-            ShowMessageDialog?.Invoke("Export Error", $"Failed to export:\n{ex.Message}", MessageType.Error);
+            StatusMessage = $"Ошибка экспорта: {ex.Message}";
+            ShowMessageDialog?.Invoke("Ошибка экспорта", $"Не удалось экспортировать:\n{ex.Message}", MessageType.Error);
         }
         finally
         {
@@ -1192,6 +1243,9 @@ public partial class MainWindowViewModel : ObservableObject
         }
     }
 
+    /// <summary>
+    /// Выбирает все кривые текущего файла для экспорта
+    /// </summary>
     [RelayCommand]
     private void SelectAllCurves()
     {
@@ -1204,6 +1258,9 @@ public partial class MainWindowViewModel : ObservableObject
         UpdateSelectedForExportCount();
     }
 
+    /// <summary>
+    /// Снимает выбор со всех кривых для экспорта
+    /// </summary>
     [RelayCommand]
     private void DeselectAllCurves()
     {
@@ -1217,7 +1274,9 @@ public partial class MainWindowViewModel : ObservableObject
         UpdateSelectedForExportCount();
     }
 
-
+    /// <summary>
+    /// Очищает обратные вызовы кривых файла для предотвращения утечек памяти
+    /// </summary>
     private void CleanupFileCallbacks(LasFileViewModel file)
     {
         foreach (var curve in file.Curves)

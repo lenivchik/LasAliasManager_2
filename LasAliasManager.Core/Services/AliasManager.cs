@@ -4,7 +4,7 @@ using static LasAliasManager.Core.Models.AliasDatabase;
 namespace LasAliasManager.Core.Services;
 
 /// <summary>
-/// Main service for managing curve name aliases
+/// Основной сервис для управления псевдонимами кривых
 /// </summary>
 public class AliasManager
 {
@@ -14,7 +14,7 @@ public class AliasManager
     public AliasDatabase Database { get; private set; }
 
     /// <summary>
-    /// Current database file path (CSV or TXT)
+    /// Текущий путь к файлу базы данных (CSV или TXT)
     /// </summary>
     public string? DatabaseFilePath { get; private set; }
     public AliasManager()
@@ -25,7 +25,7 @@ public class AliasManager
     }
 
     /// <summary>
-    /// Loads alias database from a CSV file
+    /// Загружает базу данных псевдонимов из CSV файла
     /// </summary>
     public void LoadFromCsv(string csvFilePath)
     {
@@ -36,7 +36,7 @@ public class AliasManager
     }
 
     /// <summary>
-    /// Saves the current database to CSV file
+    /// Сохраняет текущую базу данных в CSV файл
     /// </summary>
     public void SaveToCsv(string? csvFilePath = null)
     {
@@ -44,7 +44,7 @@ public class AliasManager
 
         if (string.IsNullOrEmpty(csvFilePath))
         {
-            throw new InvalidOperationException("CSV file path not specified");
+            throw new InvalidOperationException("Путь к CSV файлу не указан");
         }
 
         var aliases = Database.GetAllAliasesGrouped();
@@ -56,7 +56,7 @@ public class AliasManager
 
 
     /// <summary>
-    /// Analyzes a single LAS file for unknown curve names
+    /// Анализирует один LAS файл на наличие неизвестных имён кривых
     /// </summary>
     public LasAnalysisResult AnalyzeLasFile(string filePath)
     {
@@ -73,7 +73,7 @@ public class AliasManager
             foreach (var curve in content.Curves)
             {
                 var cleanName = CleanCurveName(curve.Mnemonic);
-                var (classification, baseName) = Database.Classify(cleanName);  // Single lookup!
+                var (classification, baseName) = Database.Classify(cleanName);  // Один поиск в словаре!
 
                 switch (classification)
                 {
@@ -105,7 +105,7 @@ public class AliasManager
     }
 
     /// <summary>
-    /// Analyzes multiple LAS files in a directory
+    /// Анализирует несколько LAS файлов в директории
     /// </summary>
     public List<LasAnalysisResult> AnalyzeDirectory(string directory, bool recursive = true)
     {
@@ -121,7 +121,7 @@ public class AliasManager
     }
 
     /// <summary>
-    /// Adds an unknown curve as an alias to an existing base name
+    /// Добавляет неизвестную кривую как полевое имя к существующему базовому имени
     /// </summary>
     public bool AddAsAlias(string curveName, string baseName)
     {
@@ -129,7 +129,7 @@ public class AliasManager
     }
 
     /// <summary>
-    /// Adds an unknown curve as a new base name
+    /// Добавляет неизвестную кривую как новое базовое имя
     /// </summary>
     public void AddAsNewBase(string curveName)
     {
@@ -137,13 +137,16 @@ public class AliasManager
     }
 
     /// <summary>
-    /// Adds an unknown curve to the ignored list
+    /// Добавляет неизвестную кривую в список игнорируемых
     /// </summary>
     public bool AddAsIgnored(string curveName)
     {
         return Database.AddIgnored(curveName);
     }
 
+    /// <summary>
+    /// Очищает имя кривой от лишних пробелов
+    /// </summary>
     private string CleanCurveName(string name)
     {
         return name.Trim();
@@ -151,7 +154,7 @@ public class AliasManager
 }
 
 /// <summary>
-/// Result of analyzing a LAS file
+/// Результат анализа LAS файла
 /// </summary>
 public class LasAnalysisResult
 {
@@ -163,45 +166,49 @@ public class LasAnalysisResult
     public List<LasFileParser.CurveDefinition> CurveDefinitions { get; set; } = new();
 
     /// <summary>
-    /// Curves that were mapped to base names
-    /// Key: base name, Value: list of field names found
+    /// Кривые, сопоставленные с базовыми именами
+    /// Ключ: базовое имя, Значение: список найденных полевых имен
     /// </summary>
     public Dictionary<string, List<string>> MappedCurves { get; set; } = new();
     
     /// <summary>
-    /// Curves that were in the ignored list
+    /// Кривые из списка игнорируемых
     /// </summary>
     public List<string> IgnoredCurves { get; set; } = new();
     
     /// <summary>
-    /// Curves that were not found in aliases or ignored list
+    /// Кривые, не найденные ни в псевдонимах, ни в списке игнорируемых
     /// </summary>
     public List<string> UnknownCurves { get; set; } = new();
     
     /// <summary>
-    /// Error message if parsing failed
+    /// Сообщение об ошибке при парсинге
     /// </summary>
     public string? Error { get; set; }
 
     public bool HasUnknown => UnknownCurves.Count > 0;
     public bool HasError => !string.IsNullOrEmpty(Error);
 
+    /// <summary>
+    /// Получает описание кривой по мнемонике
+    /// </summary>
     public LasFileParser.CurveDefinition? GetCurveDefinition(string mnemonic)
     {
         return CurveDefinitions.FirstOrDefault(c =>
             c.Mnemonic.Equals(mnemonic, StringComparison.OrdinalIgnoreCase));
     }
+
     public override string ToString()
     {
         if (HasError)
-            return $"{FileName}: ERROR - {Error}";
+            return $"{FileName}: ОШИБКА - {Error}";
         
-        return $"{FileName}: {TotalCurves} curves ({MappedCurves.Count} mapped, {IgnoredCurves.Count} ignored, {UnknownCurves.Count} unknown)";
+        return $"{FileName}: {TotalCurves} кривых ({MappedCurves.Count} сопоставлено, {IgnoredCurves.Count} игнорируется, {UnknownCurves.Count} неизвестных)";
     }
 }
 
 /// <summary>
-/// Represents an unknown curve with its source file information
+/// Представляет неизвестную кривую с информацией об исходном файле
 /// </summary>
 public class UnknownCurveInfo
 {
@@ -219,6 +226,6 @@ public class UnknownCurveInfo
     
     public override string ToString()
     {
-        return $"{CurveName} (from: {SourceFilePath})";
+        return $"{CurveName} (из: {SourceFilePath})";
     }
 }

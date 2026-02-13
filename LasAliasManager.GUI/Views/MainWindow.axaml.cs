@@ -27,11 +27,15 @@ public partial class MainWindow : Window
         Opened += MainWindow_Opened;
 
     }
+
+    /// <summary>
+    /// Обработчик открытия окна — загружает начальные данные из аргументов командной строки
+    /// </summary>
     private async void MainWindow_Opened(object? sender, EventArgs e)
     {
         Opened -= MainWindow_Opened;
 
-        // First arg = directory with LAS files
+        // Первый аргумент = директория с LAS файлами
         if (Program.Args.Length > 0 && Directory.Exists(Program.Args[0]))
         {
             var folderPath = Program.Args[0];
@@ -42,20 +46,19 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// Shows a message dialog with appropriate icon based on message type
+    /// Показывает диалог сообщения с соответствующей иконкой в зависимости от типа
     /// </summary>
-    /// 
     private async void ShowMessageDialogAsync(string title, string message, MessageType type)
     {
         if (type == MessageType.Success)
         {
-            // Custom success dialog with green checkmark
+            // Пользовательский диалог успеха с зелёной галочкой
             var dialog = new SuccessDialog(title, message);
             await dialog.ShowDialog(this);
         }
         else
         {
-            // Standard message box for other types
+            // Стандартное окно сообщения для остальных типов
             var icon = type switch
             {
                 MessageType.Warning => MsBox.Avalonia.Enums.Icon.Warning,
@@ -68,6 +71,9 @@ public partial class MainWindow : Window
         }
     }
 
+    /// <summary>
+    /// Получает директорию приложения для диалогов выбора файлов
+    /// </summary>
     private async Task<IStorageFolder?> GetAppDirectoryAsync()
     {
         var topLevel = GetTopLevel(this);
@@ -80,13 +86,17 @@ public partial class MainWindow : Window
         }
         return null;
     }
+
+    /// <summary>
+    /// Обработчик кнопки загрузки базы данных
+    /// </summary>
     private async void LoadDatabase_Click(object? sender, RoutedEventArgs e)
     {
         var topLevel = GetTopLevel(this);
         if (topLevel == null) return;
         var startLocation = await GetAppDirectoryAsync();
 
-        // Let user choose CSV or TXT file
+        // Пользователь выбирает CSV файл
         var files = await topLevel.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
         {
             Title = "Выберите файл с БД (CSV)",
@@ -94,7 +104,7 @@ public partial class MainWindow : Window
             SuggestedStartLocation = startLocation,
             FileTypeFilter = new[]
             {
-                new FilePickerFileType("CSV Files") { Patterns = new[] { "*.csv" } }
+                new FilePickerFileType("CSV файлы") { Patterns = new[] { "*.csv" } }
             }
         });
 
@@ -104,6 +114,9 @@ public partial class MainWindow : Window
         await ViewModel.LoadCsvDatabaseCommand.ExecuteAsync(selectedFile);
     }
 
+    /// <summary>
+    /// Обработчик кнопки выбора папки
+    /// </summary>
     private async void LoadFolder_Click(object? sender, RoutedEventArgs e)
     {
         var topLevel = GetTopLevel(this);
@@ -111,7 +124,7 @@ public partial class MainWindow : Window
 
         var folders = await topLevel.StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
         {
-            Title = "Выберите папку с Las файлами",
+            Title = "Выберите папку с LAS файлами",
             AllowMultiple = false
         });
 
@@ -121,37 +134,46 @@ public partial class MainWindow : Window
         await ViewModel.LoadFolderCommand.ExecuteAsync(folderPath);
     }
 
+    /// <summary>
+    /// Обработчик кнопки выхода
+    /// </summary>
     private void Exit_Click(object? sender, RoutedEventArgs e)
     {
         Close();
     }
 
+    /// <summary>
+    /// Обработчик кнопки «О программе»
+    /// </summary>
     private async void About_Click(object? sender, RoutedEventArgs e)
     {
         var box = MessageBoxManager.GetMessageBoxStandard(
             "О программе",
-            "LAS Curve Alias Manager v1.0\n\n" +
+            "Менеджер псевдонимов кривых LAS v1.0\n\n" +
             "Формат базы данных:\n" +
-            "• CSV - единичный файл\n" +
+            "• CSV — единичный файл\n" +
             "Возможности:\n" +
             "• Загрузка и анализ LAS файлов из папок/директорий\n" +
             "• Связывание полевых и основных имен\n" +
             "• Выгрузка в TXT файл\n" +
-            "• Сохранение иземенеий в БД",
+            "• Сохранение изменений в БД",
             ButtonEnum.Ok,
             MsBox.Avalonia.Enums.Icon.Info);
 
         await box.ShowAsync();
     }
 
+    /// <summary>
+    /// Обработчик экспорта пользовательских сопоставлений в ListNamesAlias
+    /// </summary>
     private async void ExportListNamesAlias_Click(object? sender, RoutedEventArgs e)
     {
-        // Check if there are user-defined mappings before opening file picker
+        // Проверяем наличие пользовательских сопоставлений перед открытием диалога
         if (ViewModel.UserDefinedCount == 0)
         {
             var box = MessageBoxManager.GetMessageBoxStandard(
-                "Export",
-                "No user-defined mappings to export.\nSave changes first to track mappings.",
+                "Экспорт",
+                "Нет пользовательских сопоставлений для экспорта.\nСначала сохраните изменения для отслеживания сопоставлений.",
                 ButtonEnum.Ok,
                  MsBox.Avalonia.Enums.Icon.Warning);
             await box.ShowWindowDialogAsync(this);
@@ -161,18 +183,18 @@ public partial class MainWindow : Window
         var topLevel = GetTopLevel(this);
         if (topLevel == null) return;
 
-        // Get application directory as starting location
+        // Получаем директорию приложения как начальное расположение
         var startLocation = await GetAppDirectoryAsync();
 
         var file = await topLevel.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
         {
-            Title = "Export User-Defined to ListNamesAlias.txt",
+            Title = "Экспорт пользовательских сопоставлений в ListNamesAlias.txt",
             DefaultExtension = "txt",
             SuggestedFileName = "ListNamesAlias.txt",
             SuggestedStartLocation = startLocation,
             FileTypeChoices = new[]
             {
-                new FilePickerFileType("Text Files") { Patterns = new[] { "*.txt" } }
+                new FilePickerFileType("Текстовые файлы") { Patterns = new[] { "*.txt" } }
             }
         });
 
@@ -181,9 +203,12 @@ public partial class MainWindow : Window
         await ViewModel.ExportListNamesAliasCommand.ExecuteAsync(file.Path.LocalPath);
     }
 
+    /// <summary>
+    /// Обработчик экспорта выбранных кривых
+    /// </summary>
     private async void ExportSelectedCurves_Click(object? sender, RoutedEventArgs e)
     {
-        // Check if curves are selected before opening file picker
+        // Проверяем наличие выбранных кривых перед открытием диалога
         if (ViewModel.SelectedForExportCount == 0)
         {
             var box = MessageBoxManager.GetMessageBoxStandard(
@@ -198,7 +223,7 @@ public partial class MainWindow : Window
         var topLevel = GetTopLevel(this);
         if (topLevel == null) return;
 
-        // Get application directory as starting location
+        // Получаем директорию приложения как начальное расположение
         var startLocation = await GetAppDirectoryAsync();
 
         var file = await topLevel.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
@@ -209,7 +234,7 @@ public partial class MainWindow : Window
             SuggestedStartLocation = startLocation,
             FileTypeChoices = new[]
             {
-                new FilePickerFileType("Text Files") { Patterns = new[] { "*.txt" } }
+                new FilePickerFileType("Текстовые файлы") { Patterns = new[] { "*.txt" } }
             }
         });
 
@@ -218,33 +243,39 @@ public partial class MainWindow : Window
         await ViewModel.ExportSelectedCurvesCommand.ExecuteAsync(file.Path.LocalPath);
     }
 
+    /// <summary>
+    /// Обработчик получения фокуса полем ввода основного имени — открывает выпадающий список
+    /// </summary>
     private void PrimaryNameTextBox_GotFocus(object? sender, Avalonia.Input.GotFocusEventArgs e)
     {
         if (sender is TextBox textBox && textBox.DataContext is CurveRowViewModel viewModel)
         {
-            // Ensure full list is available, then open dropdown
+            // Обновляем полный список, затем открываем выпадающий список
             viewModel.RefreshFilteredPrimaryNames();
             if (viewModel.FilteredPrimaryNames?.Count > 0)
             {
                 viewModel.IsComboBoxOpen = true;
             }
 
-            // Select all text so user can start typing to filter immediately
+            // Выделяем весь текст, чтобы пользователь мог сразу начать ввод для фильтрации
             textBox.SelectAll();
         }
     }
 
+    /// <summary>
+    /// Обработчик потери фокуса полем ввода основного имени — фиксирует выбранное значение
+    /// </summary>
     private void PrimaryNameTextBox_LostFocus(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         if (sender is TextBox textBox && textBox.DataContext is CurveRowViewModel viewModel)
         {
-            // Small delay to allow click on list item to register first
+            // Небольшая задержка, чтобы клик по элементу списка успел обработаться
             Avalonia.Threading.Dispatcher.UIThread.Post(() =>
             {
-                // If dropdown is still open, the user clicked somewhere else — close it
+                // Если выпадающий список всё ещё открыт, пользователь кликнул в другое место — закрываем
                 viewModel.IsComboBoxOpen = false;
 
-                // Commit: update PrimaryName with the search text
+                // Фиксируем: обновляем PrimaryName введённым текстом
                 if (!string.IsNullOrWhiteSpace(viewModel.SearchText))
                 {
                     var match = viewModel.AvailablePrimaryNames?.FirstOrDefault(
@@ -254,31 +285,37 @@ public partial class MainWindow : Window
                 }
                 else
                 {
-                    // User cleared the text — set PrimaryName to empty
+                    // Пользователь очистил текст — устанавливаем PrimaryName в пустое значение
                     viewModel.PrimaryName = string.Empty;
                 }
             }, Avalonia.Threading.DispatcherPriority.Background);
         }
     }
 
+    /// <summary>
+    /// Обработчик кнопки раскрытия выпадающего списка базовых имен
+    /// </summary>
     private void ShowPrimaryNamesDropdown_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         if (sender is Button button && button.DataContext is CurveRowViewModel viewModel)
         {
             if (viewModel.IsComboBoxOpen)
             {
-                // Just close it
+                // Просто закрываем
                 viewModel.IsComboBoxOpen = false;
             }
             else
             {
-                // Show full unfiltered list without clearing the displayed text
+                // Показываем полный нефильтрованный список без очистки отображаемого текста
                 viewModel.RefreshFilteredPrimaryNames();
                 viewModel.IsComboBoxOpen = true;
             }
         }
     }
 
+    /// <summary>
+    /// Обработчик выбора элемента из выпадающего списка базовых имен
+    /// </summary>
     private void PrimaryNameListBox_SelectionChanged(object? sender, Avalonia.Controls.SelectionChangedEventArgs e)
     {
         if (sender is ListBox listBox &&
@@ -288,11 +325,14 @@ public partial class MainWindow : Window
             viewModel.PrimaryName = selectedName;
             viewModel.IsComboBoxOpen = false;
 
-            // Reset the listbox selection so the same item can be re-selected later
+            // Сбрасываем выбор, чтобы тот же элемент можно было выбрать снова
             listBox.SelectedItem = null;
         }
     }
 
+    /// <summary>
+    /// Обработчик закрытия окна — проверяет несохранённые изменения и неэкспортированные кривые
+    /// </summary>
     protected override async void OnClosing(WindowClosingEventArgs e)
     {
         // Если уже подтверждали — просто закрываем
@@ -302,7 +342,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        // Check for unsaved changes first
+        // Сначала проверяем несохранённые изменения
         if (ViewModel.HasUnsavedChanges)
         {
             e.Cancel = true;
@@ -326,10 +366,9 @@ public partial class MainWindow : Window
             if (result == "Да")
             {
                 await ViewModel.SaveChangesCommand.ExecuteAsync(null);
-                // After saving, check for unexported curves
+                // После сохранения проверяем неэкспортированные кривые
                 if (ViewModel.HasUnexportedSelectedCurves)
                 {
-                    // Reset flag to show the export warning
                     await CheckUnexportedCurvesAsync(e);
                 }
                 else
@@ -340,7 +379,7 @@ public partial class MainWindow : Window
             }
             else if (result == "Нет")
             {
-                // User doesn't want to save changes, but check for unexported curves
+                // Пользователь не хочет сохранять, но проверяем неэкспортированные кривые
                 if (ViewModel.HasUnexportedSelectedCurves)
                 {
                     await CheckUnexportedCurvesAsync(e);
@@ -351,21 +390,24 @@ public partial class MainWindow : Window
                     Close();
                 }
             }
-            // Cancel — ничего не делаем
+            // Отмена — ничего не делаем
             return;
         }
 
-        // No unsaved changes, check for unexported curves
+        // Нет несохранённых изменений, проверяем неэкспортированные кривые
         if (ViewModel.HasUnexportedSelectedCurves)
         {
             await CheckUnexportedCurvesAsync(e);
             return;
         }
 
-        // No warnings needed, close normally
+        // Предупреждения не нужны, закрываем нормально
         base.OnClosing(e);
     }
 
+    /// <summary>
+    /// Проверяет наличие неэкспортированных кривых и показывает предупреждение
+    /// </summary>
     private async Task CheckUnexportedCurvesAsync(WindowClosingEventArgs e)
     {
         e.Cancel = true;
@@ -397,6 +439,6 @@ public partial class MainWindow : Window
             _closingConfirmed = true;
             Close();
         }
-        // No — ничего не делаем, пользователь вернется к приложению
+        // Нет — ничего не делаем, пользователь вернётся к приложению
     }
 }

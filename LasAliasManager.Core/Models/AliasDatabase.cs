@@ -16,14 +16,14 @@ public class AliasDatabase
 
     public enum CurveClassification
     {
-        Unknown,   // Not in dictionary
-        Ignored,   // In dictionary with null value
-        Mapped     // In dictionary with base name
+        Unknown,   // Не найдено в словаре
+        Ignored,   // В словаре со значением null
+        Mapped     // В словаре с базовым именем
     }
 
 
     /// <summary>
-    ///Словарь:
+    /// Словарь:
     /// - Ключ: полевое имя
     /// - Значение: базовое значение или null, если игнорируется
     /// </summary>
@@ -39,7 +39,7 @@ public class AliasDatabase
     /// <summary>
     /// Находит базовое имя для заданного полевого имени
     /// </summary>
-    /// <returns> Базовое имя, если найдено или null, если неизвестно/игнорируется</returns>
+    /// <returns>Базовое имя, если найдено или null, если неизвестно/игнорируется</returns>
     public string? FindBaseName(string fieldName)
     {
         var trimmed = fieldName.Trim();
@@ -47,7 +47,7 @@ public class AliasDatabase
     }
 
     /// <summary>
-    /// Проверка: игнориуется? (есть в списке && значение null) .
+    /// Проверка: игнорируется? (есть в списке && значение null)
     /// </summary>
     public bool IsIgnored(string name)
     {
@@ -56,7 +56,7 @@ public class AliasDatabase
     }
 
     /// <summary>
-    /// Наличие имени в БД.
+    /// Наличие имени в БД
     /// </summary>
     public bool IsKnown(string name)
     {
@@ -74,7 +74,7 @@ public class AliasDatabase
 
 
     /// <summary>
-    /// Добавление базового имени и соответвующих полевых 
+    /// Добавление базового имени и соответствующих полевых
     /// </summary>
     public void AddBaseName(string baseName, IEnumerable<string>? aliases = null)
     {
@@ -98,11 +98,11 @@ public class AliasDatabase
     }
 
     /// <summary>
-    /// Добавление нового полевого имени.
+    /// Добавление нового полевого имени
     /// </summary>
-    /// <param name="baseName"> Базовое имя </param>
-    /// <param name="fieldName"> Полевое имя </param>
-    /// <returns>True successfull, false нет базового имени</returns>
+    /// <param name="baseName">Базовое имя</param>
+    /// <param name="fieldName">Полевое имя</param>
+    /// <returns>True — успешно, false — нет базового имени</returns>
     public bool AddAliasToBase(string baseName, string fieldName)
     {
         var trimmedBase = baseName.Trim();
@@ -115,31 +115,31 @@ public class AliasDatabase
     }
 
     /// <summary>
-    /// Adds a name to the ignored list.
+    /// Добавляет имя в список игнорируемых
     /// </summary>
     public bool AddIgnored(string name)
     {
         var trimmed = name.Trim();
 
-        // Don't ignore base names
+        // Базовые имена нельзя игнорировать
         if (_baseNames.Contains(trimmed))
         {
             return false;
         }
 
-        // null value indicates ignored
+        // null означает "игнорируется"
         _fieldMappings[trimmed] = null;
         return true;
     }
 
     /// <summary>
-    /// Removes a field name from all mappings.
+    /// Удаляет полевое имя из всех сопоставлений
     /// </summary>
     public bool RemoveFieldName(string fieldName)
     {
         var trimmed = fieldName.Trim();
 
-        // Don't remove base names
+        // Базовые имена удалять нельзя
         if (_baseNames.Contains(trimmed))
         {
             return false;
@@ -152,7 +152,7 @@ public class AliasDatabase
 
 
     /// <summary>
-    /// Gets all base names (for dropdown population).
+    /// Возвращает все базовые имена (для выпадающего списка)
     /// </summary>
     public IEnumerable<string> GetAllBaseNames()
     {
@@ -160,7 +160,7 @@ public class AliasDatabase
     }
 
     /// <summary>
-    /// Gets all ignored names.
+    /// Возвращает все игнорируемые имена
     /// </summary>
     public IEnumerable<string> GetAllIgnoredNames()
     {
@@ -171,7 +171,7 @@ public class AliasDatabase
     }
 
     /// <summary>
-    /// Gets all aliases for a specific base name.
+    /// Возвращает все полевые имена для заданного базового имени
     /// </summary>
     public IEnumerable<string> GetAliasesForBase(string baseName)
     {
@@ -183,7 +183,7 @@ public class AliasDatabase
     }
 
     /// <summary>
-    /// Gets all mappings grouped by base name (for export).
+    /// Возвращает все сопоставления, сгруппированные по базовому имени (для экспорта)
     /// </summary>
     public Dictionary<string, List<string>> GetAllAliasesGrouped()
     {
@@ -198,7 +198,7 @@ public class AliasDatabase
     }
 
     /// <summary>
-    /// Gets all ignored names as a HashSet (for export compatibility).
+    /// Возвращает все игнорируемые имена в виде HashSet (для совместимости при экспорте)
     /// </summary>
     public HashSet<string> GetIgnoredNamesSet()
     {
@@ -206,14 +206,14 @@ public class AliasDatabase
     }
 
     /// <summary>
-    /// Gets statistics about the database.
+    /// Возвращает статистику по базе данных
     /// </summary>
     public (int BaseCount, int TotalAliases, int IgnoredCount) GetStatistics()
     {
         int baseCount = _baseNames.Count;
         int ignoredCount = _fieldMappings.Count(kvp => kvp.Value == null);
         int totalMappings = _fieldMappings.Count(kvp => kvp.Value != null);
-        int aliasCount = totalMappings - baseCount; // Subtract base names mapped to themselves
+        int aliasCount = totalMappings - baseCount; // Вычитаем базовые имена, сопоставленные сами с собой
 
         return (baseCount, aliasCount, ignoredCount);
     }
@@ -221,7 +221,7 @@ public class AliasDatabase
 
 
     /// <summary>
-    /// Clears all data from the database.
+    /// Очищает все данные из базы
     /// </summary>
     public void Clear()
     {
@@ -231,7 +231,7 @@ public class AliasDatabase
 
 
     /// <summary>
-    /// Classifies a field name and returns base name
+    /// Классифицирует полевое имя и возвращает базовое имя
     /// </summary>
     public (CurveClassification Classification, string? BaseName) Classify(string fieldName)
     {
@@ -247,6 +247,3 @@ public class AliasDatabase
         return (CurveClassification.Unknown, null);
     }
 }
-
-
-

@@ -8,35 +8,35 @@ using static LasAliasManager.Core.Constants;
 namespace LasAliasManager.GUI.ViewModels;
 
 /// <summary>
-/// Represents a single row in the curve table
+/// Представляет одну строку в таблице кривых
 /// </summary>
 public partial class CurveRowViewModel : ObservableObject
 {
     /// <summary>
-    /// Flag to prevent cascading updates between PrimaryName and SearchText
+    /// Флаг для предотвращения каскадных обновлений между PrimaryName и SearchText
     /// </summary>
     private bool _suppressSideEffects;
 
     /// <summary>
-    /// Reference to available primary names for the ComboBox
+    /// Ссылка на доступные базовые имена для выпадающего списка
     /// </summary>
     [ObservableProperty]
     private ObservableCollection<string>? _availablePrimaryNames;
 
     /// <summary>
-    /// Filtered list based on current search text
+    /// Отфильтрованный список на основе текущего текста поиска
     /// </summary>
     [ObservableProperty]
     private ObservableCollection<string>? _filteredPrimaryNames;
 
     /// <summary>
-    /// Search text for filtering primary names
+    /// Текст поиска для фильтрации базовых имен
     /// </summary>
     [ObservableProperty]
     private string _searchText = string.Empty;
 
     /// <summary>
-    /// Whether the ComboBox dropdown is open
+    /// Открыт ли выпадающий список
     /// </summary>
     [ObservableProperty]
     private bool _isComboBoxOpen;
@@ -53,7 +53,7 @@ public partial class CurveRowViewModel : ObservableObject
 
         RefreshFilteredPrimaryNames();
 
-        // Open dropdown when user starts typing
+        // Открываем выпадающий список при начале ввода
         if (!string.IsNullOrEmpty(value))
         {
             IsComboBoxOpen = true;
@@ -62,7 +62,7 @@ public partial class CurveRowViewModel : ObservableObject
 
     partial void OnPrimaryNameChanging(string? oldValue, string? newValue)
     {
-        // Notify undo system before the value changes
+        // Уведомляем систему отмены перед изменением значения
         OnBeforePrimaryNameChanged?.Invoke(this, oldValue);
     }
 
@@ -70,7 +70,7 @@ public partial class CurveRowViewModel : ObservableObject
     {
         IsModified = value != OriginalPrimaryName;
 
-        // Reactively update classification based on assigned name
+        // Реактивно обновляем классификацию на основе назначенного имени
         if (string.IsNullOrEmpty(value))
         {
             IsUnknown = true;
@@ -91,7 +91,7 @@ public partial class CurveRowViewModel : ObservableObject
         OnPropertyChanged(nameof(StatusColor));
         OnModificationChanged?.Invoke();
 
-        // Update search text to match selected value without triggering side effects
+        // Обновляем текст поиска для соответствия выбранному значению без побочных эффектов
         if (value != null && value != SearchText)
         {
             _suppressSideEffects = true;
@@ -109,8 +109,8 @@ public partial class CurveRowViewModel : ObservableObject
 
 
     /// <summary>
-    /// Refreshes the filtered list based on search text.
-    /// When search text matches the current PrimaryName, show all items (not filtered).
+    /// Обновляет отфильтрованный список на основе текста поиска.
+    /// Когда текст поиска совпадает с текущим PrimaryName, показывает все элементы (без фильтрации).
     /// </summary>
     public void RefreshFilteredPrimaryNames()
     {
@@ -120,7 +120,7 @@ public partial class CurveRowViewModel : ObservableObject
             return;
         }
 
-        // If search text is empty OR matches the current PrimaryName, show all items
+        // Если текст поиска пуст ИЛИ совпадает с текущим PrimaryName, показываем все элементы
         if (string.IsNullOrWhiteSpace(SearchText) ||
             SearchText.Equals(PrimaryName, StringComparison.OrdinalIgnoreCase))
         {
@@ -128,7 +128,7 @@ public partial class CurveRowViewModel : ObservableObject
         }
         else
         {
-            // Filter items that contain the search text (case-insensitive)
+            // Фильтруем элементы, содержащие текст поиска (без учёта регистра)
             var filtered = AvailablePrimaryNames
                 .Where(name => name.Contains(SearchText, StringComparison.OrdinalIgnoreCase))
                 .ToList();
@@ -138,123 +138,123 @@ public partial class CurveRowViewModel : ObservableObject
     }
 
     /// <summary>
-    /// The original curve field name from the LAS file
+    /// Исходное полевое имя кривой из LAS файла
     /// </summary>
     [ObservableProperty]
     private string _curveFieldName = string.Empty;
 
     /// <summary>
-    /// Description/comment of the curve from the LAS file
+    /// Описание/комментарий кривой из LAS файла
     /// </summary>
     [ObservableProperty]
     private string _curveDescription = string.Empty;
 
     /// <summary>
-    /// Units of the curve from the LAS file
+    /// Единицы измерения кривой из LAS файла
     /// </summary>
     [ObservableProperty]
     private string _curveUnits = string.Empty;
 
     /// <summary>
-    /// The selected primary (base) name from the dropdown
+    /// Выбранное базовое (основное) имя из выпадающего списка
     /// </summary>
     [ObservableProperty]
     private string? _primaryName;
 
     /// <summary>
-    /// The LAS file name this curve came from
+    /// Имя LAS файла, из которого получена кривая
     /// </summary>
     [ObservableProperty]
     private string _fileName = string.Empty;
 
     /// <summary>
-    /// Full path to the LAS file
+    /// Полный путь к LAS файлу
     /// </summary>
     [ObservableProperty]
     private string _filePath = string.Empty;
 
     /// <summary>
-    /// File size in bytes
+    /// Размер файла в байтах
     /// </summary>
     [ObservableProperty]
     private long _fileSize;
 
     /// <summary>
-    /// Formatted file size string (KB, MB, etc.)
+    /// Отформатированный размер файла (КБ, МБ и т.д.)
     /// </summary>
     public string FileSizeFormatted => FormatFileSize(FileSize);
 
     /// <summary>
-    /// STRT (Top/Start depth) from well information
+    /// STRT (Кровля/Начальная глубина) из информации о скважине
     /// </summary>
     [ObservableProperty]
     private double? _top;
 
     /// <summary>
-    /// STOP (Bottom/End depth) from well information
+    /// STOP (Подошва/Конечная глубина) из информации о скважине
     /// </summary>
     [ObservableProperty]
     private double? _bottom;
 
     /// <summary>
-    /// STEP from well information
+    /// STEP из информации о скважине
     /// </summary>
     [ObservableProperty]
     private double? _step;
 
     /// <summary>
-    /// Formatted Top value
+    /// Отформатированное значение кровли
     /// </summary>
     public string TopFormatted => Top.HasValue ? Top.Value.ToString("F2") : "-";
 
     /// <summary>
-    /// Formatted Bottom value
+    /// Отформатированное значение подошвы
     /// </summary>
     public string BottomFormatted => Bottom.HasValue ? Bottom.Value.ToString("F2") : "-";
 
     /// <summary>
-    /// Formatted Step value
+    /// Отформатированное значение шага
     /// </summary>
     public string StepFormatted => Step.HasValue ? Step.Value.ToString("F4") : "-";
 
     /// <summary>
-    /// Unit for depth values
+    /// Единица измерения глубины
     /// </summary>
     [ObservableProperty]
     private string _depthUnit = string.Empty;
 
     /// <summary>
-    /// Whether this curve mapping has been modified
+    /// Изменено ли сопоставление этой кривой
     /// </summary>
     [ObservableProperty]
     private bool _isModified;
 
     /// <summary>
-    /// Whether this is an unknown curve (no mapping found)
+    /// Является ли кривая неизвестной (сопоставление не найдено)
     /// </summary>
     [ObservableProperty]
     private bool _isUnknown;
 
     /// <summary>
-    /// Whether this curve is in the ignored list
+    /// Находится ли кривая в списке игнорируемых
     /// </summary>
     [ObservableProperty]
     private bool _isIgnored;
 
     /// <summary>
-    /// Whether this curve is selected for export (checkbox)
+    /// Выбрана ли кривая для экспорта (флажок)
     /// </summary>
     [ObservableProperty]
     private bool _isSelectedForExport;
 
     /// <summary>
-    /// Whether this curve has been exported to TXT file
+    /// Экспортирована ли кривая в TXT файл
     /// </summary>
     [ObservableProperty]
     private bool _isExported;
 
     /// <summary>
-    /// Status text for display
+    /// Текст статуса для отображения
     /// </summary>
     public string StatusText
     {
@@ -268,6 +268,10 @@ public partial class CurveRowViewModel : ObservableObject
             return UiStrings.StatusMapped;
         }
     }
+
+    /// <summary>
+    /// Цвет статуса для отображения
+    /// </summary>
     public Avalonia.Media.IBrush StatusColor
     {
         get
@@ -279,23 +283,24 @@ public partial class CurveRowViewModel : ObservableObject
             return Avalonia.Media.Brushes.Green;
         }
     }
+
     /// <summary>
-    /// Original primary name before any changes
+    /// Исходное базовое имя до внесения изменений
     /// </summary>
     public string? OriginalPrimaryName { get; set; }
 
     /// <summary>
-    /// Callback when modification status changes
+    /// Обратный вызов при изменении статуса модификации
     /// </summary>
     public Action? OnModificationChanged { get; set; }
 
     /// <summary>
-    /// Callback when PrimaryName is about to change — provides (curve, oldValue) for undo tracking.
+    /// Обратный вызов перед изменением PrimaryName — передаёт (кривая, старое значение) для отслеживания отмены
     /// </summary>
     public Action<CurveRowViewModel, string?>? OnBeforePrimaryNameChanged { get; set; }
 
     /// <summary>
-    /// Callback when selection for export changes
+    /// Обратный вызов при изменении выбора для экспорта
     /// </summary>
     public Action? OnSelectionForExportChanged { get; set; }
 
@@ -348,9 +353,12 @@ public partial class CurveRowViewModel : ObservableObject
         OnPropertyChanged(nameof(FileSizeFormatted));
     }
 
+    /// <summary>
+    /// Форматирует размер файла в удобочитаемый вид
+    /// </summary>
     private static string FormatFileSize(long bytes)
     {
-        string[] sizes = { "B", "KB", "MB", "GB" };
+        string[] sizes = { "Б", "КБ", "МБ", "ГБ" };
         double len = bytes;
         int order = 0;
         while (len >= 1024 && order < sizes.Length - 1)

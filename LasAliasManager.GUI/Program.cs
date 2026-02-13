@@ -14,7 +14,7 @@ class Program
 
         Args = args;
 
-        // Register encoding provider for legacy encodings
+        // Регистрируем провайдер кодировок для поддержки устаревших кодировок (Windows-1251 и др.)
         Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
         
         BuildAvaloniaApp()

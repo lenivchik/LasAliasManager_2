@@ -5,6 +5,9 @@ using LasAliasManager.GUI.Views;
 
 namespace LasAliasManager.GUI;
 
+/// <summary>
+/// Главный класс приложения Avalonia
+/// </summary>
 public partial class App : Application
 {
     public override void Initialize()
