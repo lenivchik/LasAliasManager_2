@@ -6,6 +6,7 @@
         mc:Ignorable="d" d:DesignWidth="1200" d:DesignHeight="700"
         x:Class="LasAliasManager.GUI.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
+        Icon="/Assets/favicon.ico"
         Title="Менеджер псевдонимов кривых LAS"
         Width="1400" Height="800"
         MinWidth="900" MinHeight="500"
