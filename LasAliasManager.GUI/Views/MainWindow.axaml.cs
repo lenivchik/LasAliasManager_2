@@ -23,10 +23,60 @@ public partial class MainWindow : Window
         InitializeComponent();
         var viewModel = new MainWindowViewModel();
         viewModel.ShowMessageDialog = ShowMessageDialogAsync;
+        viewModel.ShowInputDialog = ShowInputDialogAsync;
         DataContext = viewModel;
         Opened += MainWindow_Opened;
 
     }
+
+
+    private async Task<string?> ShowInputDialogAsync(string title, string prompt)
+    {
+        var inputDialog = new Window
+        {
+            Title = title,
+            Width = 400,
+            Height = 170,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            CanResize = false,
+            SystemDecorations = SystemDecorations.BorderOnly
+        };
+
+        string? result = null;
+        var textBox = new TextBox { Margin = new Avalonia.Thickness(10), Watermark = prompt };
+        var okButton = new Button { Content = "ОК", Width = 80, Margin = new Avalonia.Thickness(5), IsDefault = true };
+        var cancelButton = new Button { Content = "Отмена", Width = 80, Margin = new Avalonia.Thickness(5), IsCancel = true };
+
+        okButton.Click += (_, _) => { result = textBox.Text; inputDialog.Close(); };
+        cancelButton.Click += (_, _) => { inputDialog.Close(); };
+
+        var buttonPanel = new StackPanel
+        {
+            Orientation = Avalonia.Layout.Orientation.Horizontal,
+            HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right,
+            Margin = new Avalonia.Thickness(10, 0, 10, 10),
+            Children = { okButton, cancelButton }
+        };
+
+        inputDialog.Content = new StackPanel
+        {
+            Children =
+        {
+            new TextBlock
+            {
+                Text = prompt,
+                Margin = new Avalonia.Thickness(10, 10, 10, 0)
+            },
+            textBox,
+            buttonPanel
+        }
+        };
+
+        await inputDialog.ShowDialog(this);
+        return result;
+    }
+
+
 
     /// <summary>
     /// Обработчик открытия окна — загружает начальные данные из аргументов командной строки
@@ -269,24 +319,33 @@ public partial class MainWindow : Window
     {
         if (sender is TextBox textBox && textBox.DataContext is CurveRowViewModel viewModel)
         {
-            // Небольшая задержка, чтобы клик по элементу списка успел обработаться
+            // Capture the current viewModel reference at focus-loss time.
+            // When DataGrid recycles rows during file switch, DataContext changes
+            // before the posted callback runs — we must detect and skip that case.
+            var capturedViewModel = viewModel;
+            var capturedTextBox = textBox;
+
             Avalonia.Threading.Dispatcher.UIThread.Post(() =>
             {
-                // Если выпадающий список всё ещё открыт, пользователь кликнул в другое место — закрываем
-                viewModel.IsComboBoxOpen = false;
+                // CRITICAL: verify DataContext hasn't been recycled to a different curve
+                if (capturedTextBox.DataContext != capturedViewModel)
+                    return;
 
-                // Фиксируем: обновляем PrimaryName введённым текстом
-                if (!string.IsNullOrWhiteSpace(viewModel.SearchText))
+                // Close dropdown
+                capturedViewModel.IsComboBoxOpen = false;
+
+                // Commit: update PrimaryName with the search text
+                if (!string.IsNullOrWhiteSpace(capturedViewModel.SearchText))
                 {
-                    var match = viewModel.AvailablePrimaryNames?.FirstOrDefault(
-                        name => name.Equals(viewModel.SearchText, StringComparison.OrdinalIgnoreCase));
+                    var match = capturedViewModel.AvailablePrimaryNames?.FirstOrDefault(
+                        name => name.Equals(capturedViewModel.SearchText, StringComparison.OrdinalIgnoreCase));
 
-                    viewModel.PrimaryName = match ?? viewModel.SearchText;
+                    capturedViewModel.PrimaryName = match ?? capturedViewModel.SearchText;
                 }
                 else
                 {
-                    // Пользователь очистил текст — устанавливаем PrimaryName в пустое значение
-                    viewModel.PrimaryName = string.Empty;
+                    // User cleared the text — set PrimaryName to empty
+                    capturedViewModel.PrimaryName = string.Empty;
                 }
             }, Avalonia.Threading.DispatcherPriority.Background);
         }
@@ -440,5 +499,18 @@ public partial class MainWindow : Window
             Close();
         }
         // Нет — ничего не делаем, пользователь вернётся к приложению
+    }
+
+    private async void AddCustomName_Click(object? sender, RoutedEventArgs e)
+    {
+        await ViewModel.AddCustomNameCommand.ExecuteAsync(null);
+    }
+
+    private async void RemoveBaseName_Click(object? sender, RoutedEventArgs e)
+    {
+        if (sender is MenuItem menuItem && menuItem.DataContext is string baseName)
+        {
+            await ViewModel.RemoveBaseNameCommand.ExecuteAsync(baseName);
+        }
     }
 }

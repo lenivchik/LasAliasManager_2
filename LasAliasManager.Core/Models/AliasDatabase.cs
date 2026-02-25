@@ -246,4 +246,36 @@ public class AliasDatabase
 
         return (CurveClassification.Unknown, null);
     }
+
+    /// <summary>
+    /// Удаляет базовое имя и все связанные полевые имена из базы данных.
+    /// </summary>
+    /// <param name="baseName">Базовое имя для удаления</param>
+    /// <returns>True если имя найдено и удалено, false если не найдено</returns>
+    public bool RemoveBaseName(string baseName)
+    {
+        var trimmed = baseName.Trim();
+
+        if (!_baseNames.Contains(trimmed))
+            return false;
+
+        // Find all field names that map to this base name
+        var aliasesToRemove = _fieldMappings
+            .Where(kvp => trimmed.Equals(kvp.Value, StringComparison.OrdinalIgnoreCase))
+            .Select(kvp => kvp.Key)
+            .ToList();
+
+        // Remove all aliases (including the base name's own self-mapping)
+        foreach (var alias in aliasesToRemove)
+        {
+            _fieldMappings.Remove(alias);
+        }
+
+        // Remove from base names set
+        _baseNames.Remove(trimmed);
+
+        return true;
+    }
+
+
 }

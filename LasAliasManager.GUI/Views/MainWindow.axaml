@@ -63,6 +63,9 @@
         Command="{Binding UndoLastChangeCommand}" 
         IsEnabled="{Binding CanUndo}"
         ToolTip.Tip="{Binding UndoDescription}"/>
+                <Button Content="＋ Имя" Click="AddCustomName_Click"
+         ToolTip.Tip="Добавить новое основное имя в список"/>
+
             </StackPanel>
         </Border>
 
@@ -228,10 +231,16 @@
                                  SelectionChanged="PrimaryNameListBox_SelectionChanged"
                                  MaxHeight="280"
                                  Background="White">
-                            <ListBox.ItemTemplate>
+                                 <ListBox.ItemTemplate>
                                 <DataTemplate>
-                                    <TextBlock Text="{Binding}" 
-                                               Padding="8,4"/>
+                                    <TextBlock Text="{Binding}">
+                                        <TextBlock.ContextMenu>
+                                            <ContextMenu>
+                                                <MenuItem Header="Удалить из БД"
+                                                          Click="RemoveBaseName_Click"/>
+                                            </ContextMenu>
+                                        </TextBlock.ContextMenu>
+                                    </TextBlock>
                                 </DataTemplate>
                             </ListBox.ItemTemplate>
                         </ListBox>
