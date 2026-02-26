@@ -228,23 +228,22 @@
                             CornerRadius="4"
                             BoxShadow="0 4 8 0 #40000000">
                         <ListBox ItemsSource="{Binding FilteredPrimaryNames}"
-         SelectionChanged="PrimaryNameListBox_SelectionChanged"
-         MaxHeight="280"
-         Background="White">
-    <ListBox.ItemTemplate>
-        <DataTemplate>
-            <TextBlock Text="{Binding}">
-                <TextBlock.ContextMenu>
-                    <ContextMenu Opening="PrimaryNameContextMenu_Opening">
-                        <MenuItem Header="Удалить из БД"
-                                  Tag="{Binding}"
-                                  Click="RemoveBaseName_Click"/>
-                    </ContextMenu>
-                </TextBlock.ContextMenu>
-            </TextBlock>
-        </DataTemplate>
-    </ListBox.ItemTemplate>
-</ListBox>
+                                 SelectionChanged="PrimaryNameListBox_SelectionChanged"
+                                 MaxHeight="280"
+                                 Background="White">
+                                 <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding}">
+                                        <TextBlock.ContextMenu>
+                                            <ContextMenu>
+                                                <MenuItem Header="Удалить из БД"
+                                                          Click="RemoveBaseName_Click"/>
+                                            </ContextMenu>
+                                        </TextBlock.ContextMenu>
+                                    </TextBlock>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
                     </Border>
                 </Popup>
             </Grid>
