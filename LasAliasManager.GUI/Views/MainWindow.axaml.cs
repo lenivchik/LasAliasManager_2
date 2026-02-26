@@ -1,15 +1,16 @@
 ﻿using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
+using Avalonia.VisualTree;
 using LasAliasManager.GUI.ViewModels;
 using MsBox.Avalonia;
+using MsBox.Avalonia.Dto;
 using MsBox.Avalonia.Enums;
+using MsBox.Avalonia.Models;
 using System;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
-using MsBox.Avalonia.Dto;
-using MsBox.Avalonia.Models;
 
 namespace LasAliasManager.GUI.Views;
 
@@ -17,6 +18,7 @@ public partial class MainWindow : Window
 {
     private MainWindowViewModel ViewModel => (MainWindowViewModel)DataContext!;
     private bool _closingConfirmed = false;
+    private bool _suppressNextLostFocusCommit = false;
 
     public MainWindow()
     {
@@ -319,22 +321,23 @@ public partial class MainWindow : Window
     {
         if (sender is TextBox textBox && textBox.DataContext is CurveRowViewModel viewModel)
         {
-            // Capture the current viewModel reference at focus-loss time.
-            // When DataGrid recycles rows during file switch, DataContext changes
-            // before the posted callback runs — we must detect and skip that case.
+            // Right-click on a dropdown item triggered this LostFocus — skip commit
+            if (_suppressNextLostFocusCommit)
+            {
+                _suppressNextLostFocusCommit = false;
+                return;
+            }
+
             var capturedViewModel = viewModel;
             var capturedTextBox = textBox;
 
             Avalonia.Threading.Dispatcher.UIThread.Post(() =>
             {
-                // CRITICAL: verify DataContext hasn't been recycled to a different curve
                 if (capturedTextBox.DataContext != capturedViewModel)
                     return;
 
-                // Close dropdown
                 capturedViewModel.IsComboBoxOpen = false;
 
-                // Commit: update PrimaryName with the search text
                 if (!string.IsNullOrWhiteSpace(capturedViewModel.SearchText))
                 {
                     var match = capturedViewModel.AvailablePrimaryNames?.FirstOrDefault(
@@ -344,7 +347,6 @@ public partial class MainWindow : Window
                 }
                 else
                 {
-                    // User cleared the text — set PrimaryName to empty
                     capturedViewModel.PrimaryName = string.Empty;
                 }
             }, Avalonia.Threading.DispatcherPriority.Background);
@@ -375,19 +377,61 @@ public partial class MainWindow : Window
     /// <summary>
     /// Обработчик выбора элемента из выпадающего списка базовых имен
     /// </summary>
+    //private void PrimaryNameListBox_SelectionChanged(object? sender, Avalonia.Controls.SelectionChangedEventArgs e)
+    //{
+    //    if (sender is ListBox listBox &&
+    //        listBox.SelectedItem is string selectedName &&
+    //        listBox.DataContext is CurveRowViewModel viewModel)
+    //    {
+    //        // Ignore right-click selections — they're for the context menu
+    //        var pointerDevice = Avalonia.Input.Pointer.Current; 
+    //        // Check if this was triggered by a right-click
+    //        if (e.Source is TextBlock tb && tb.ContextMenu != null)
+    //        {
+    //            listBox.SelectedItem = null;
+    //            return;
+    //        }
+
+    //        viewModel.PrimaryName = selectedName;
+    //        viewModel.IsComboBoxOpen = false;
+    //        listBox.SelectedItem = null;
+    //    }
+    //}
+    private void PrimaryNameItem_PointerPressed(object? sender, Avalonia.Input.PointerPressedEventArgs e)
+    {
+        if (e.GetCurrentPoint(null).Properties.IsRightButtonPressed)
+        {
+            // Suppress the LostFocus commit that's about to fire
+            _suppressNextLostFocusCommit = true;
+            e.Handled = true;
+            return;
+        }
+
+        if (sender is TextBlock tb &&
+            tb.DataContext is string selectedName &&
+            tb.FindAncestorOfType<ListBox>()?.DataContext is CurveRowViewModel viewModel)
+        {
+            viewModel.PrimaryName = selectedName;
+            viewModel.IsComboBoxOpen = false;
+        }
+    }
+
     private void PrimaryNameListBox_SelectionChanged(object? sender, Avalonia.Controls.SelectionChangedEventArgs e)
     {
+        // If a context menu is about to open (right-click), don't commit
+        if (_suppressNextLostFocusCommit)
+            return;
+
         if (sender is ListBox listBox &&
             listBox.SelectedItem is string selectedName &&
             listBox.DataContext is CurveRowViewModel viewModel)
         {
             viewModel.PrimaryName = selectedName;
             viewModel.IsComboBoxOpen = false;
-
-            // Сбрасываем выбор, чтобы тот же элемент можно было выбрать снова
             listBox.SelectedItem = null;
         }
     }
+
 
     /// <summary>
     /// Обработчик закрытия окна — проверяет несохранённые изменения и неэкспортированные кривые
@@ -508,9 +552,17 @@ public partial class MainWindow : Window
 
     private async void RemoveBaseName_Click(object? sender, RoutedEventArgs e)
     {
-        if (sender is MenuItem menuItem && menuItem.DataContext is string baseName)
+        if (sender is MenuItem menuItem && menuItem.Tag is string baseName)
         {
             await ViewModel.RemoveBaseNameCommand.ExecuteAsync(baseName);
         }
+    }
+
+    /// <summary>
+    /// Fires just before the right-click context menu opens — suppress the pending LostFocus commit
+    /// </summary>
+    private void PrimaryNameContextMenu_Opening(object? sender, System.ComponentModel.CancelEventArgs e)
+    {
+        _suppressNextLostFocusCommit = true;
     }
 }
