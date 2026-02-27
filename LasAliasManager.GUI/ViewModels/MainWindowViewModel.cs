@@ -976,6 +976,122 @@ public partial class MainWindowViewModel : ObservableObject
         StatusMessage = $"Удалено основное имя: '{baseName}'";
     }
 
+    /// <summary>
+    /// Добавляет основное имя напрямую без показа диалога.
+    /// Вызывается из окна управления именами (BaseNameManagerWindow).
+    /// </summary>
+    public async Task AddBaseNameDirectAsync(string baseName)
+    {
+        if (string.IsNullOrWhiteSpace(baseName))
+            return;
+
+        baseName = baseName.Trim();
+
+        // Добавляем в список доступных имён
+        if (!AvailablePrimaryNames.Contains(baseName, StringComparer.OrdinalIgnoreCase))
+        {
+            AvailablePrimaryNames.Add(baseName);
+        }
+
+        // Добавляем в БД и сохраняем CSV
+        if (HasDatabase)
+        {
+            _aliasManager.Database.AddBaseName(baseName, Array.Empty<string>());
+            await Task.Run(() => _aliasManager.SaveToCsv());
+        }
+
+        // Обновляем отфильтрованные списки на всех кривых
+        foreach (var file in LasFiles)
+        {
+            foreach (var curve in file.Curves)
+            {
+                curve.RefreshFilteredPrimaryNames();
+            }
+        }
+
+        StatusMessage = $"Добавлено основное имя: '{baseName}'";
+    }
+
+    /// <summary>
+    /// Переименовывает основное имя: удаляет старое, создаёт новое с перенесёнными алиасами,
+    /// обновляет все кривые, использующие старое имя.
+    /// Вызывается из окна управления именами (BaseNameManagerWindow).
+    /// </summary>
+    public async Task RenameBaseNameAsync(string oldName, string newName)
+    {
+        if (string.IsNullOrWhiteSpace(oldName) || string.IsNullOrWhiteSpace(newName))
+            return;
+
+        oldName = oldName.Trim();
+        newName = newName.Trim();
+
+        if (oldName.Equals(newName, StringComparison.OrdinalIgnoreCase))
+            return;
+
+        if (HasDatabase)
+        {
+            // 1. Получаем все алиасы старого имени для переноса
+            var oldAliases = _aliasManager.Database.GetAliasesForBase(oldName).ToList();
+
+            // 2. Удаляем старое имя из БД
+            _aliasManager.Database.RemoveBaseName(oldName);
+
+            // 3. Добавляем новое имя с перенесёнными алиасами
+            _aliasManager.Database.AddBaseName(newName, oldAliases);
+
+            // 4. Сохраняем CSV
+            await Task.Run(() => _aliasManager.SaveToCsv());
+        }
+
+        // 5. Обновляем список доступных имён
+        var oldItem = AvailablePrimaryNames.FirstOrDefault(
+            n => n.Equals(oldName, StringComparison.OrdinalIgnoreCase));
+        if (oldItem != null)
+        {
+            AvailablePrimaryNames.Remove(oldItem);
+        }
+
+        if (!AvailablePrimaryNames.Contains(newName, StringComparer.OrdinalIgnoreCase))
+        {
+            AvailablePrimaryNames.Add(newName);
+        }
+
+        // 6. Обновляем кривые, которые использовали старое имя
+        _suppressUndoRecording = true;
+        try
+        {
+            foreach (var file in LasFiles)
+            {
+                foreach (var curve in file.Curves)
+                {
+                    if (oldName.Equals(curve.PrimaryName, StringComparison.OrdinalIgnoreCase))
+                    {
+                        curve.PrimaryName = newName;
+                    }
+                    if (oldName.Equals(curve.OriginalPrimaryName, StringComparison.OrdinalIgnoreCase))
+                    {
+                        curve.OriginalPrimaryName = newName;
+                    }
+                }
+            }
+        }
+        finally
+        {
+            _suppressUndoRecording = false;
+        }
+
+        // 7. Обновляем отфильтрованные списки на всех кривых
+        foreach (var file in LasFiles)
+        {
+            foreach (var curve in file.Curves)
+            {
+                curve.RefreshFilteredPrimaryNames();
+            }
+            file.RefreshStatus();
+        }
+
+        StatusMessage = $"Переименовано: '{oldName}' → '{newName}'";
+    }
     private void UpdateHasUnsavedChanges()
     {
         HasUnsavedChanges = LasFiles.Any(f => f.Curves.Any(c => c.IsModified));

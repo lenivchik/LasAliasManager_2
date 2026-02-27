@@ -213,6 +213,31 @@ public partial class MainWindow : Window
         await box.ShowAsync();
     }
 
+
+    /// <summary>
+    /// Открывает окно управления основными именами
+    /// </summary>
+    private async void ManageBaseNames_Click(object? sender, RoutedEventArgs e)
+    {
+        var managerWindow = new BaseNameManagerWindow(ViewModel);
+        await managerWindow.ShowDialog(this);
+
+        // После закрытия окна обновляем все выпадающие списки, если были изменения
+        if (managerWindow.HasChanges)
+        {
+            foreach (var file in ViewModel.LasFiles)
+            {
+                foreach (var curve in file.Curves)
+                {
+                    curve.RefreshFilteredPrimaryNames();
+                }
+                file.RefreshStatus();
+            }
+
+            ViewModel.RefreshViewCommand.Execute(null);
+        }
+    }
+
     /// <summary>
     /// Обработчик экспорта пользовательских сопоставлений в ListNamesAlias
     /// </summary>
@@ -501,16 +526,4 @@ public partial class MainWindow : Window
         // Нет — ничего не делаем, пользователь вернётся к приложению
     }
 
-    private async void AddCustomName_Click(object? sender, RoutedEventArgs e)
-    {
-        await ViewModel.AddCustomNameCommand.ExecuteAsync(null);
-    }
-
-    private async void RemoveBaseName_Click(object? sender, RoutedEventArgs e)
-    {
-        if (sender is MenuItem menuItem && menuItem.DataContext is string baseName)
-        {
-            await ViewModel.RemoveBaseNameCommand.ExecuteAsync(baseName);
-        }
-    }
 }
